@@ -5,12 +5,24 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "smooth-operator"
 version = "0.1.0"
-description = "Planar two-joint manipulation experiments in PyBullet"
+description = "Three-joint manipulation experiments in PyBullet"
 requires-python = ">=3.9"
-dependencies = ["pybullet==3.2.7", "numpy==1.26.4", "Pillow==11.3.0"]
+dependencies = ["pybullet==3.2.7", "numpy>=1.26.4,<2.3", "Pillow==11.3.0"]
+
+[project.optional-dependencies]
+vla = ["lerobot[smolvla,training]>=0.6.1; python_version >= '3.12'"]
 
 [project.scripts]
 smooth-operator = "smooth_operator.demo:main"
+smooth-operator-generate = "smooth_operator.dataset:main"
+smooth-operator-generate-raw = "smooth_operator.raw_dataset:main"
+smooth-operator-convert = "smooth_operator.dataset:main"
+smooth-operator-train = "smooth_operator.training:main"
+smooth-operator-evaluate = "smooth_operator.evaluation:main"
+smooth-operator-inference-server = "smooth_operator.inference_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+smooth_operator = ["assets/*.urdf"]

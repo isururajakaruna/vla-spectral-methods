@@ -1,55 +1,128 @@
-"""Run the initial scripted manipulation demo."""
+"""Command-line entry point for the three-joint arm simulation."""
+
 import argparse
 import json
 from pathlib import Path
+import time
 
-from PIL import Image
+import pybullet as p
 
-from .simulation import PlanarArm, SimulationClosed
+from .simulation import ManipulatorSimulation
+from .motion import BasicPickPlaceController
+from .inference_protocol import SocketActionChunkPolicy
+from .vla import PromptResolver, SafeVLAExecutor
 
 
-def run_demo():
+def _joint_sliders(simulation: ManipulatorSimulation) -> tuple[int, ...]:
+    sliders = []
+    for joint_index in simulation.joint_indices:
+        info = p.getJointInfo(
+            simulation.robot_id,
+            joint_index,
+            physicsClientId=simulation.client_id,
+        )
+        sliders.append(
+            p.addUserDebugParameter(
+                info[1].decode("utf-8"),
+                info[8],
+                info[9],
+                0.0,
+                physicsClientId=simulation.client_id,
+            )
+        )
+    return tuple(sliders)
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--headless", action="store_true", help="Run without a desktop window")
-    parser.add_argument("--seed", type=int, help="Reproduce a scene; omitted means a fresh random seed")
-    parser.add_argument("--output", type=Path, default=Path("artifacts/demo"))
-    parser.add_argument("--hold", type=float, default=10, help="Seconds to keep the GUI open after completion")
+    parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--hold", type=float, default=0.0)
+    parser.add_argument("--no-sliders", action="store_true")
+    parser.add_argument("--move", choices=("apple", "coke_can", "pen"))
+    parser.add_argument("--prompt", type=str)
+    parser.add_argument("--controller", choices=("astar", "smolvla"), default="astar")
+    parser.add_argument("--checkpoint", default="lerobot/smolvla_base")
+    parser.add_argument("--inference-host", default="127.0.0.1")
+    parser.add_argument("--inference-port", type=int, default=5478)
+    parser.add_argument("--result", type=Path, default=Path("artifacts/result.json"))
+    parser.add_argument(
+        "--chart", type=Path, default=Path("artifacts/basic_motion.png")
+    )
     args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=True)
-    with PlanarArm(gui=not args.headless, seed=args.seed) as sim:
-        Image.fromarray(sim.camera()).save(args.output / "01_initial.png")
-        sim.move_to(sim.start)
-        sim.attach()
-        Image.fromarray(sim.camera()).save(args.output / "02_attached.png")
-        sim.move_to(sim.goal, seconds=3)
-        sim.release()
-        sim.retreat()
-        for _ in range(240):
-            sim.step()
-        Image.fromarray(sim.camera()).save(args.output / "03_placed.png")
-        result = {"controller": "joint_space_astar_quintic", **sim.placement_metrics(),
-                  "seed": sim.seed, "obstacle_contact_steps": sim.obstacle_contact_steps,
-                  "obstacle_center_xy_m": list(sim.planner.obstacle_center),
-                  "obstacle_half_extents_xy_m": list(sim.planner.obstacle_half),
-                  "simulation_time_s": sim.steps * sim.dt,
-                  "object_position_m": sim.object_position().tolist(), "goal_xy_m": list(sim.goal),
-                  "pickup_cell": list(sim.pickup_cell), "goal_cell": list(sim.goal_cell),
-                  "goal_bounds_xy_m": list(sim.cell_bounds(sim.goal_cell)), "cell_size_m": sim.cell_size}
-        result["success"] = result["success"] and sim.obstacle_contact_steps == 0
-        (args.output / "result.json").write_text(json.dumps(result, indent=2) + "\n")
-        print(json.dumps(result, indent=2))
-        if sim.gui:
-            for _ in range(max(0, round(args.hold / sim.dt))):
-                sim.step()
-        if not result["success"]:
-            raise SystemExit("Placement failed")
+    if args.move and args.prompt:
+        parser.error("--move and --prompt cannot be used together")
 
+    with ManipulatorSimulation(gui=not args.headless) as simulation:
+        selected_object = args.move
+        destination = None
+        result = None
+        if args.prompt:
+            if args.controller == "smolvla":
+                policy = SocketActionChunkPolicy(args.inference_host, args.inference_port)
+                result = SafeVLAExecutor(
+                    simulation, policy, args.checkpoint
+                ).execute(args.prompt)
+                policy.close()
+                selected_object = result["object"]
+            else:
+                positions = {
+                    name: p.getBasePositionAndOrientation(
+                        body, physicsClientId=simulation.client_id
+                    )[0][:2]
+                    for name, body in simulation.object_ids.items()
+                }
+                action = PromptResolver().resolve(args.prompt, positions)
+                selected_object = action.object_name
+                destination = action.destination
 
-def main():
-    try:
-        run_demo()
-    except (SimulationClosed, KeyboardInterrupt):
-        print("Simulation closed.")
+        if selected_object and result is None:
+            controller = BasicPickPlaceController(simulation)
+            metrics = controller.move_object(
+                selected_object,
+                destination if destination is not None else (0.45, 0.35),
+            )
+            controller.save_results(args.chart, args.result)
+            result = {
+                "controller": "astar",
+                "fallback_reason": None,
+                "checkpoint": None,
+                "prompt": args.prompt,
+                "seed": None,
+                "object": selected_object,
+                "task_success": True,
+                **metrics,
+            }
+        if result is not None:
+            args.result.parent.mkdir(parents=True, exist_ok=True)
+            args.result.write_text(json.dumps(result, indent=2) + "\n")
+            print(json.dumps(result, indent=2))
+
+        sliders = (
+            _joint_sliders(simulation)
+            if simulation.gui and not args.no_sliders and not selected_object
+            else ()
+        )
+        end_time = time.monotonic() + args.hold if args.hold > 0 else None
+
+        try:
+            while p.isConnected(simulation.client_id):
+                if sliders:
+                    simulation.command_joints(
+                        [
+                            p.readUserDebugParameter(
+                                slider, physicsClientId=simulation.client_id
+                            )
+                            for slider in sliders
+                        ]
+                    )
+                simulation.step()
+                if args.headless or selected_object or (
+                    end_time is not None and time.monotonic() >= end_time
+                ):
+                    break
+                time.sleep(simulation.TIME_STEP)
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == "__main__":

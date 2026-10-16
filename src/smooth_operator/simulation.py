@@ -1,258 +1,438 @@
-"""Two powered revolute joints, a fixed base, and a magnetic tool.
+"""PyBullet lifecycle and joint control for the manipulator simulation."""
 
-SI units throughout. XY is the motion plane; Z is vertical.
-Attachment is an abstraction, not a physical grasp or a learned policy.
-"""
-import math
-import time
-import secrets
-from itertools import product
+from pathlib import Path
+from typing import Optional, Sequence
 
 import numpy as np
 import pybullet as p
 
-from .geometry import footprint_coverage
-from .planning import JointPlanner
+
+ASSET_DIR = Path(__file__).with_name("assets")
+OBJECT_PLACEMENTS = {
+    "apple": ("apple.urdf", (-0.45, -0.35, 0.037)),
+    "coke_can": ("coke_can.urdf", (-0.25, -0.35, 0.060)),
+    "pen": ("pen.urdf", (0.05, -0.35, 0.012)),
+}
 
 
-class SimulationClosed(Exception):
-    """The desktop simulation window was closed."""
+class ManipulatorSimulation:
+    """Load and control the static environment and elevated SCARA arm."""
 
+    TIME_STEP = 1.0 / 240.0
+    JOINT_COUNT = 3
+    ROBOT_BASE = (-0.68, 0.0, 0.002)
 
-class PlanarArm:
-    lengths = (0.40, 0.32)
-    dt = 1 / 240
-    grid_origin = (-0.70, -0.65)
-    grid_shape = (17, 13)  # columns, rows; indices increase with world X and Y
-    cell_size = 0.10
-    object_half_extents = (0.022, 0.022, 0.025)
-    height = 0.12
-
-    home_joints = np.array([-1.2, 1.4])
-
-    def __init__(self, gui=False, seed=None):
+    def __init__(self, gui: bool = False, training_seed: Optional[int] = None) -> None:
         self.gui = gui
-        self.seed = secrets.randbits(32) if seed is None else seed
-        self.planner = JointPlanner()
-        self._choose_cells()
-        self.client = p.connect(p.GUI if gui else p.DIRECT)
-        if self.client < 0:
+        self.client_id = p.connect(p.GUI if gui else p.DIRECT)
+        if self.client_id < 0:
             raise RuntimeError("Could not connect to PyBullet")
-        self.attachment = None
-        self.steps = 0
-        self.obstacle_contact_steps = 0
-        p.setGravity(0, 0, -9.81, physicsClientId=self.client)
-        p.setTimeStep(self.dt, physicsClientId=self.client)
-        p.setPhysicsEngineParameter(numSolverIterations=100, physicsClientId=self.client)
-        self._scene()
-        self._arm()
-        self.command(self.home_joints)
-        for j, value in enumerate(self.home_joints):
-            p.resetJointState(self.robot, j, value, physicsClientId=self.client)
-        if gui:
-            p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0, physicsClientId=self.client)
-            p.resetDebugVisualizerCamera(1.25, 0, -75, (0.25, 0, 0), physicsClientId=self.client)
-            for label, xy in (("A: attach", self.start), ("B: release", self.goal)):
-                p.addUserDebugText(label, (*xy, 0.18), textSize=1.4, physicsClientId=self.client)
 
-    def _choose_cells(self):
-        rng = np.random.default_rng(self.seed)
-        candidates = []
-        for col in range(self.grid_shape[0]):
-            for row in range(self.grid_shape[1]):
-                cell = (col, row)
-                xy = self.cell_center(cell)
-                if not (0.20 <= np.linalg.norm(xy) <= 0.65):
-                    continue
-                q = self.inverse_kinematics(xy)
-                if self.planner.valid(q):
-                    candidates.append(cell)
-        rng.shuffle(candidates)
-        reachable = []
-        for cell in candidates:
-            try:
-                self.planner.plan(self.home_joints, self.inverse_kinematics(self.cell_center(cell)))
-            except ValueError:
-                continue
-            if not reachable or np.linalg.norm(np.array(self.cell_center(cell)) - self.cell_center(reachable[0])) >= 0.20:
-                reachable.append(cell)
-            if len(reachable) == 2:
-                self.pickup_cell, self.goal_cell = reachable
-                return
-        raise RuntimeError("Could not sample two reachable cells with obstacle clearance")
-
-    def _box(self, half, position, color, mass=0):
-        collision = p.createCollisionShape(p.GEOM_BOX, halfExtents=half, physicsClientId=self.client)
-        visual = p.createVisualShape(p.GEOM_BOX, halfExtents=half, rgbaColor=color, physicsClientId=self.client)
-        return p.createMultiBody(mass, collision, visual, position, physicsClientId=self.client)
-
-    def _scene(self):
-        self._box((0.85, 0.65, 0.025), (0.15, 0, -0.025), (0.88, 0.90, 0.93, 1))
-        # Visual-only tiles: no raised platforms or added collision surfaces.
-        for col in range(self.grid_shape[0]):
-            for row in range(self.grid_shape[1]):
-                cell = (col, row)
-                shade = 0.86 if (col + row) % 2 else 0.93
-                color = (shade, shade, shade, 1)
-                if cell == self.pickup_cell:
-                    color = (0.95, 0.63, 0.12, 1)
-                elif cell == self.goal_cell:
-                    color = (0.15, 0.75, 0.42, 1)
-                shape = p.createVisualShape(p.GEOM_BOX,
-                    halfExtents=(self.cell_size/2 - 0.001, self.cell_size/2 - 0.001, 0.0001),
-                    rgbaColor=color, physicsClientId=self.client)
-                p.createMultiBody(baseVisualShapeIndex=shape,
-                    basePosition=(*self.cell_center(cell), 0.0002), physicsClientId=self.client)
-        self.object = self._box(self.object_half_extents, (*self.start, 0.025), (0.9, 0.25, 0.16, 1), 0.05)
-        p.changeDynamics(self.object, -1, lateralFriction=0.35, physicsClientId=self.client)
-        self.obstacle = self._box((*self.planner.obstacle_half, 0.10),
-                                 (*self.planner.obstacle_center, 0.10), (0.48, 0.22, 0.65, 1))
-
-    def cell_bounds(self, cell):
-        col, row = cell
-        if not (0 <= col < self.grid_shape[0] and 0 <= row < self.grid_shape[1]):
-            raise ValueError("Cell is outside the workspace grid")
-        x = self.grid_origin[0] + col*self.cell_size
-        y = self.grid_origin[1] + row*self.cell_size
-        return (x, y, x+self.cell_size, y+self.cell_size)
-
-    def cell_center(self, cell):
-        xmin, ymin, xmax, ymax = self.cell_bounds(cell)
-        return ((xmin+xmax)/2, (ymin+ymax)/2)
-
-    @property
-    def start(self):
-        return self.cell_center(self.pickup_cell)
-
-    @property
-    def goal(self):
-        return self.cell_center(self.goal_cell)
-
-    def placement_metrics(self):
-        position, orientation = p.getBasePositionAndOrientation(self.object, physicsClientId=self.client)
-        rotation = np.array(p.getMatrixFromQuaternion(orientation)).reshape(3, 3)
-        corners = np.array(list(product(*[(-h, h) for h in self.object_half_extents])))
-        world = corners @ rotation.T + position
-        coverage = footprint_coverage(world[:, :2], self.cell_bounds(self.goal_cell))
-        return {"goal_coverage_pct": coverage, "placement_error_pct": 100 - coverage,
-                "success": self.attachment is None and coverage >= 99.0}
-
-    def _arm(self):
-        base_c = p.createCollisionShape(p.GEOM_CYLINDER, radius=0.07, height=0.20, physicsClientId=self.client)
-        base_v = p.createVisualShape(p.GEOM_CYLINDER, radius=0.07, length=0.20,
-                                   rgbaColor=(0.18, 0.22, 0.30, 1), physicsClientId=self.client)
-        collisions, visuals = [], []
-        for length, color in zip(self.lengths, ((0.12, 0.48, 0.75, 1), (0.12, 0.72, 0.70, 1))):
-            collisions.append(p.createCollisionShape(p.GEOM_BOX, halfExtents=(length/2, 0.022, 0.022),
-                               collisionFramePosition=(length/2, 0, 0), physicsClientId=self.client))
-            visuals.append(p.createVisualShape(p.GEOM_BOX, halfExtents=(length/2, 0.022, 0.022),
-                           visualFramePosition=(length/2, 0, 0), rgbaColor=color, physicsClientId=self.client))
-        # Fixed tool extends down to the object; it adds no actuated degree of freedom.
-        visuals.append(p.createVisualShape(p.GEOM_CYLINDER, radius=0.028, length=0.08,
-                       visualFramePosition=(0, 0, -0.04), rgbaColor=(0.22, 0.25, 0.30, 1), physicsClientId=self.client))
-        self.robot = p.createMultiBody(
-            baseMass=0, baseCollisionShapeIndex=base_c, baseVisualShapeIndex=base_v,
-            basePosition=(0, 0, self.height),
-            linkMasses=[0.6, 0.45, 0.05], linkCollisionShapeIndices=collisions + [-1],
-            linkVisualShapeIndices=visuals,
-            linkPositions=[(0, 0, 0), (self.lengths[0], 0, 0), (self.lengths[1], 0, 0)],
-            linkOrientations=[(0, 0, 0, 1)] * 3,
-            linkInertialFramePositions=[(self.lengths[0]/2, 0, 0), (self.lengths[1]/2, 0, 0), (0, 0, 0)],
-            linkInertialFrameOrientations=[(0, 0, 0, 1)] * 3,
-            linkParentIndices=[0, 1, 2], linkJointTypes=[p.JOINT_REVOLUTE, p.JOINT_REVOLUTE, p.JOINT_FIXED],
-            linkJointAxis=[(0, 0, 1)] * 3, physicsClientId=self.client)
-
-    def joint_state(self):
-        states = p.getJointStates(self.robot, [0, 1], physicsClientId=self.client)
-        return np.array([s[0] for s in states]), np.array([s[1] for s in states])
-
-    def endpoint(self):
-        return np.array(p.getLinkState(self.robot, 2, computeForwardKinematics=True, physicsClientId=self.client)[4])
-
-    def object_position(self):
-        return np.array(p.getBasePositionAndOrientation(self.object, physicsClientId=self.client)[0])
-
-    def inverse_kinematics(self, xy):
-        x, y = xy
-        l1, l2 = self.lengths
-        c = (x*x + y*y - l1*l1 - l2*l2) / (2*l1*l2)
-        if not math.isfinite(c) or abs(c) > 1 + 1e-9:
-            raise ValueError(f"Point {xy} is outside the reachable annulus")
-        q2 = math.acos(max(-1, min(1, c)))
-        return np.array([math.atan2(y, x) - math.atan2(l2*math.sin(q2), l1+l2*math.cos(q2)), q2])
-
-    def command(self, joints):
-        joints = np.asarray(joints, dtype=float)
-        if joints.shape != (2,) or not np.isfinite(joints).all():
-            raise ValueError("Expected two finite joint angles")
-        p.setJointMotorControlArray(self.robot, [0, 1], p.POSITION_CONTROL,
-                                   targetPositions=joints, forces=[12, 12],
-                                   positionGains=[0.15, 0.15], velocityGains=[1, 1], physicsClientId=self.client)
-
-    def step(self):
         try:
-            p.stepSimulation(physicsClientId=self.client)
-        except p.error:
-            if self.gui and not p.isConnected(self.client):
-                raise SimulationClosed() from None
+            self._configure_physics()
+            self.environment_id, self.robot_id = self._load_assets()
+            self.object_ids = self._load_objects()
+            self.joint_indices = self._find_controlled_joints()
+            if len(self.joint_indices) != self.JOINT_COUNT:
+                raise RuntimeError(
+                    f"Expected {self.JOINT_COUNT} controlled joints, "
+                    f"found {len(self.joint_indices)}"
+                )
+            self.tool_link_index = p.getNumJoints(
+                self.robot_id, physicsClientId=self.client_id
+            ) - 1
+            self.attached_object: Optional[str] = None
+            self._attachment_offset = np.zeros(3)
+            self._attachment_orientation = (0.0, 0.0, 0.0, 1.0)
+            self._attachment_height: Optional[float] = None
+            self.obstacle_link_indices = self._environment_links("obstacle_")
+            self.obstacle_bounds = [
+                (-0.34, 0.13, -0.22, 0.31),
+                (0.23, -0.25, 0.37, -0.11),
+            ]
+            self.training_obstacle_ids: list[int] = []
+            self.goal_marker_id: Optional[int] = None
+            self.goal_position: Optional[tuple[float, float]] = None
+            if training_seed is not None:
+                self._randomize_training_scene(training_seed)
+            self.collision_count = 0
+            self.command_joints((0.0, 0.0, 0.0))
+        except Exception:
+            self.close()
             raise
-        self.steps += 1
-        if (p.getContactPoints(self.robot, self.obstacle, physicsClientId=self.client) or
-                p.getContactPoints(self.object, self.obstacle, physicsClientId=self.client)):
-            self.obstacle_contact_steps += 1
+
+    def _configure_physics(self) -> None:
+        p.setGravity(0.0, 0.0, -9.81, physicsClientId=self.client_id)
+        p.setTimeStep(self.TIME_STEP, physicsClientId=self.client_id)
+        p.setPhysicsEngineParameter(
+            fixedTimeStep=self.TIME_STEP,
+            numSolverIterations=100,
+            physicsClientId=self.client_id,
+        )
         if self.gui:
-            time.sleep(self.dt)
+            p.configureDebugVisualizer(
+                p.COV_ENABLE_RENDERING, 0, physicsClientId=self.client_id
+            )
 
-    def move_to(self, xy, seconds=2.0):
-        """Plan around the obstacle, then execute motor-driven joint waypoints."""
-        if seconds <= 0:
-            raise ValueError("Motion duration must be positive")
-        target = self.inverse_kinematics(xy)
-        self.move_joints(target, seconds)
+    def _load_assets(self) -> tuple[int, int]:
+        environment_id = p.loadURDF(
+            str(ASSET_DIR / "environment.urdf"),
+            useFixedBase=True,
+            physicsClientId=self.client_id,
+        )
+        robot_id = p.loadURDF(
+            str(ASSET_DIR / "robot.urdf"),
+            basePosition=self.ROBOT_BASE,
+            useFixedBase=True,
+            physicsClientId=self.client_id,
+        )
 
-    def retreat(self):
-        self.move_joints(self.home_joints, 2.0)
+        if self.gui:
+            p.resetDebugVisualizerCamera(
+                cameraDistance=1.8,
+                cameraYaw=45.0,
+                cameraPitch=-35.0,
+                cameraTargetPosition=(0.0, 0.0, 0.25),
+                physicsClientId=self.client_id,
+            )
+            p.configureDebugVisualizer(
+                p.COV_ENABLE_RENDERING, 1, physicsClientId=self.client_id
+            )
+        return environment_id, robot_id
 
-    def move_joints(self, target, seconds):
-        initial, _ = self.joint_state()
-        path = self.planner.plan(initial, target)
-        for a, b in zip(path, path[1:]):
-            duration = max(seconds/(len(path)-1), float(np.max(np.abs(b-a)))*2.0)
-            n = max(1, round(duration / self.dt))
-            for i in range(1, n + 1):
-                u = i / n
-                blend = 10*u**3 - 15*u**4 + 6*u**5
-                self.command(a + blend*(b-a))
-                self.step()
-        for _ in range(120):
-            self.step()
+    def _load_objects(self) -> dict[str, int]:
+        object_ids = {}
+        for name, (asset, position) in OBJECT_PLACEMENTS.items():
+            object_ids[name] = p.loadURDF(
+                str(ASSET_DIR / asset),
+                basePosition=position,
+                physicsClientId=self.client_id,
+            )
+        p.changeDynamics(
+            object_ids["pen"],
+            -1,
+            lateralFriction=1.0,
+            rollingFriction=0.2,
+            spinningFriction=0.1,
+            physicsClientId=self.client_id,
+        )
+        return object_ids
 
-    def attach(self):
-        if self.attachment is not None:
+    def _find_controlled_joints(self) -> tuple[int, ...]:
+        return tuple(
+            index
+            for index in range(
+                p.getNumJoints(self.robot_id, physicsClientId=self.client_id)
+            )
+            if p.getJointInfo(self.robot_id, index, physicsClientId=self.client_id)[2]
+            in (p.JOINT_REVOLUTE, p.JOINT_PRISMATIC)
+        )
+
+    def _environment_links(self, prefix: str) -> tuple[int, ...]:
+        links = []
+        for index in range(
+            p.getNumJoints(self.environment_id, physicsClientId=self.client_id)
+        ):
+            name = p.getJointInfo(
+                self.environment_id, index, physicsClientId=self.client_id
+            )[12].decode("utf-8")
+            if name.startswith(prefix):
+                links.append(index)
+        return tuple(links)
+
+    def _randomize_training_scene(self, seed: int) -> None:
+        rng = np.random.default_rng(seed)
+        for link in self._environment_links("cell_markers"):
+            p.changeVisualShape(
+                self.environment_id,
+                link,
+                rgbaColor=(0.0, 0.0, 0.0, 0.0),
+                physicsClientId=self.client_id,
+            )
+        for link in self.obstacle_link_indices:
+            p.setCollisionFilterGroupMask(
+                self.environment_id, link, 0, 0, physicsClientId=self.client_id
+            )
+            p.changeVisualShape(
+                self.environment_id,
+                link,
+                rgbaColor=(0.0, 0.0, 0.0, 0.0),
+                physicsClientId=self.client_id,
+            )
+        self.obstacle_bounds = []
+        obstacle_count = int(rng.integers(1, 5))
+        attempts = 0
+        while len(self.obstacle_bounds) < obstacle_count and attempts < 100:
+            attempts += 1
+            width, depth = rng.uniform(0.10, 0.19, size=2)
+            x = float(rng.uniform(-0.38, 0.38))
+            y = float(rng.uniform(-0.30, 0.30))
+            bounds = (x - width / 2, y - depth / 2, x + width / 2, y + depth / 2)
+            if any(
+                bounds[0] - 0.04 < other[2]
+                and bounds[2] + 0.04 > other[0]
+                and bounds[1] - 0.04 < other[3]
+                and bounds[3] + 0.04 > other[1]
+                for other in self.obstacle_bounds
+            ):
+                continue
+            collision = p.createCollisionShape(
+                p.GEOM_BOX,
+                halfExtents=(width / 2, depth / 2, 0.08),
+                physicsClientId=self.client_id,
+            )
+            visual = p.createVisualShape(
+                p.GEOM_BOX,
+                halfExtents=(width / 2, depth / 2, 0.08),
+                rgbaColor=(0.45, 0.24, 0.10, 1.0),
+                physicsClientId=self.client_id,
+            )
+            body = p.createMultiBody(
+                baseMass=0.0,
+                baseCollisionShapeIndex=collision,
+                baseVisualShapeIndex=visual,
+                basePosition=(x, y, 0.082),
+                physicsClientId=self.client_id,
+            )
+            self.training_obstacle_ids.append(body)
+            self.obstacle_bounds.append(bounds)
+
+        object_cells = [
+            (x, y)
+            for x in np.arange(-0.45, 0.46, 0.10)
+            for y in np.arange(-0.35, 0.36, 0.10)
+            if not any(
+                x0 - 0.06 <= x <= x1 + 0.06 and y0 - 0.06 <= y <= y1 + 0.06
+                for x0, y0, x1, y1 in self.obstacle_bounds
+            )
+        ]
+        rng.shuffle(object_cells)
+        for (name, body), xy in zip(self.object_ids.items(), object_cells):
+            current = p.getBasePositionAndOrientation(body, physicsClientId=self.client_id)
+            p.resetBasePositionAndOrientation(
+                body,
+                (xy[0], xy[1], current[0][2]),
+                current[1],
+                physicsClientId=self.client_id,
+            )
+
+    def body_bounds(self, body_id: int) -> tuple[float, float, float, float]:
+        lower, upper = p.getAABB(body_id, -1, physicsClientId=self.client_id)
+        return float(lower[0]), float(lower[1]), float(upper[0]), float(upper[1])
+
+    def set_goal_marker(self, xy: Sequence[float]) -> None:
+        """Display a collision-free target cell for a randomized task."""
+        if self.goal_marker_id is not None:
+            p.removeBody(self.goal_marker_id, physicsClientId=self.client_id)
+        visual = p.createVisualShape(
+            p.GEOM_BOX,
+            halfExtents=(0.048, 0.048, 0.001),
+            rgbaColor=(0.10, 0.75, 0.20, 1.0),
+            physicsClientId=self.client_id,
+        )
+        self.goal_marker_id = p.createMultiBody(
+            baseMass=0.0,
+            baseVisualShapeIndex=visual,
+            basePosition=(float(xy[0]), float(xy[1]), 0.004),
+            physicsClientId=self.client_id,
+        )
+        self.goal_position = (float(xy[0]), float(xy[1]))
+
+    def joint_states(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return controlled joint positions and velocities."""
+        states = p.getJointStates(
+            self.robot_id, self.joint_indices, physicsClientId=self.client_id
+        )
+        return (
+            np.asarray([state[0] for state in states], dtype=float),
+            np.asarray([state[1] for state in states], dtype=float),
+        )
+
+    def policy_state(self) -> np.ndarray:
+        positions, _ = self.joint_states()
+        return np.r_[positions, float(self.attached_object is not None)]
+
+    def tool_position(self) -> np.ndarray:
+        """Return the tool position in world coordinates."""
+        state = p.getLinkState(
+            self.robot_id,
+            self.tool_link_index,
+            computeForwardKinematics=True,
+            physicsClientId=self.client_id,
+        )
+        return np.asarray(state[4], dtype=float)
+
+    def object_position(self, object_id: int) -> np.ndarray:
+        return np.asarray(
+            p.getBasePositionAndOrientation(
+                object_id, physicsClientId=self.client_id
+            )[0],
+            dtype=float,
+        )
+
+    def camera_observation(self, width: int = 320, height: int = 240) -> np.ndarray:
+        """Capture an RGB observation of the complete workspace."""
+        if width < 1 or height < 1:
+            raise ValueError("Camera dimensions must be positive")
+        view = p.computeViewMatrix(
+            cameraEyePosition=(0.9, -1.0, 1.35),
+            cameraTargetPosition=(0.0, 0.0, 0.15),
+            cameraUpVector=(0.0, 0.0, 1.0),
+        )
+        projection = p.computeProjectionMatrixFOV(
+            fov=55.0,
+            aspect=width / height,
+            nearVal=0.05,
+            farVal=4.0,
+        )
+        image = p.getCameraImage(
+            width,
+            height,
+            viewMatrix=view,
+            projectionMatrix=projection,
+            renderer=p.ER_TINY_RENDERER,
+            physicsClientId=self.client_id,
+        )[2]
+        return np.asarray(image, dtype=np.uint8).reshape(height, width, 4)[:, :, :3]
+
+    def attach_object(self, object_name: str) -> None:
+        """Attach an object below the tool using a temporary fixed constraint."""
+        if self.attached_object is not None:
+            raise RuntimeError("An object is already attached")
+        if object_name not in self.object_ids:
+            raise ValueError(f"Unknown object {object_name!r}")
+
+        object_id = self.object_ids[object_name]
+        object_position = np.asarray(
+            p.getBasePositionAndOrientation(
+                object_id, physicsClientId=self.client_id
+            )[0]
+        )
+        offset = self.tool_position() - object_position
+        self._attachment_offset = offset
+        self._attachment_orientation = p.getBasePositionAndOrientation(
+            object_id, physicsClientId=self.client_id
+        )[1]
+        self.set_object_robot_collision(object_id, enabled=False)
+        self.attached_object = object_name
+
+    def lock_attached_height(self) -> None:
+        """Keep the attached object at its current world height."""
+        if self.attached_object is None:
+            raise RuntimeError("No object is attached")
+        object_id = self.object_ids[self.attached_object]
+        self._attachment_height = p.getBasePositionAndOrientation(
+            object_id, physicsClientId=self.client_id
+        )[0][2]
+
+    def unlock_attached_height(self) -> None:
+        self._attachment_height = None
+
+    def release_object(self) -> None:
+        """Release the currently attached object, if present."""
+        if self.attached_object is None:
             return
-        if np.linalg.norm(self.endpoint()[:2] - self.object_position()[:2]) > 0.035:
-            raise ValueError("Tool must be within 3.5 cm of the object to attach")
-        self.attachment = p.createConstraint(self.robot, 2, self.object, -1, p.JOINT_FIXED,
-                          (0, 0, 0), (0, 0, -self.height + 0.026), (0, 0, 0), physicsClientId=self.client)
-        p.changeConstraint(self.attachment, maxForce=30, physicsClientId=self.client)
+        object_id = self.object_ids[self.attached_object]
+        self.set_object_robot_collision(object_id, enabled=True)
+        self.attached_object = None
+        self._attachment_height = None
 
-    def release(self):
-        if self.attachment is not None:
-            p.removeConstraint(self.attachment, physicsClientId=self.client)
-            self.attachment = None
+    def set_object_robot_collision(self, object_id: int, enabled: bool) -> None:
+        """Enable or disable collision between an object and every robot link."""
+        for robot_link in range(-1, self.tool_link_index + 1):
+            p.setCollisionFilterPair(
+                self.robot_id,
+                object_id,
+                robot_link,
+                -1,
+                int(enabled),
+                physicsClientId=self.client_id,
+            )
 
-    def camera(self, size=512):
-        view = p.computeViewMatrix((0.20, 0, 1.65), (0.20, 0, 0), (0, 1, 0))
-        projection = p.computeProjectionMatrixFOV(55, 1, 0.05, 3)
-        image = p.getCameraImage(size, size, view, projection, renderer=p.ER_TINY_RENDERER, physicsClientId=self.client)
-        return np.asarray(image[2], dtype=np.uint8).reshape(size, size, 4)[:, :, :3]
+    def command_joints(self, positions: Sequence[float]) -> None:
+        """Set position targets for the three controllable joints."""
+        targets = np.asarray(positions, dtype=float)
+        if targets.shape != (self.JOINT_COUNT,):
+            raise ValueError(f"Expected {self.JOINT_COUNT} joint positions")
+        if not np.all(np.isfinite(targets)):
+            raise ValueError("Joint positions must be finite")
 
-    def close(self):
-        if p.isConnected(self.client):
-            p.disconnect(self.client)
+        p.setJointMotorControlArray(
+            self.robot_id,
+            self.joint_indices,
+            p.POSITION_CONTROL,
+            targetPositions=targets.tolist(),
+            forces=(45.0, 35.0, 60.0),
+            physicsClientId=self.client_id,
+        )
 
-    def __enter__(self):
+    def step(self, count: int = 1) -> None:
+        """Advance the simulation by a positive number of fixed steps."""
+        if count < 1:
+            raise ValueError("Step count must be positive")
+        for _ in range(count):
+            p.stepSimulation(physicsClientId=self.client_id)
+            if self.attached_object is not None:
+                object_id = self.object_ids[self.attached_object]
+                position = self.tool_position() - self._attachment_offset
+                if self._attachment_height is not None:
+                    position[2] = self._attachment_height
+                p.resetBasePositionAndOrientation(
+                    object_id,
+                    position.tolist(),
+                    self._attachment_orientation,
+                    physicsClientId=self.client_id,
+                )
+                p.resetBaseVelocity(
+                    object_id,
+                    linearVelocity=(0.0, 0.0, 0.0),
+                    angularVelocity=(0.0, 0.0, 0.0),
+                    physicsClientId=self.client_id,
+                )
+            for obstacle_link in self.obstacle_link_indices:
+                contacts = p.getContactPoints(
+                    bodyA=self.robot_id,
+                    bodyB=self.environment_id,
+                    linkIndexB=obstacle_link,
+                    physicsClientId=self.client_id,
+                )
+                self.collision_count += int(bool(contacts))
+                if self.attached_object is not None:
+                    object_contacts = p.getContactPoints(
+                        bodyA=self.object_ids[self.attached_object],
+                        bodyB=self.environment_id,
+                        linkIndexB=obstacle_link,
+                        physicsClientId=self.client_id,
+                    )
+                    self.collision_count += int(bool(object_contacts))
+            for obstacle_id in self.training_obstacle_ids:
+                self.collision_count += int(
+                    bool(
+                        p.getContactPoints(
+                            self.robot_id,
+                            obstacle_id,
+                            physicsClientId=self.client_id,
+                        )
+                    )
+                )
+                if self.attached_object is not None:
+                    self.collision_count += int(
+                        bool(
+                            p.getContactPoints(
+                                self.object_ids[self.attached_object],
+                                obstacle_id,
+                                physicsClientId=self.client_id,
+                            )
+                        )
+                    )
+
+    def close(self) -> None:
+        """Disconnect this simulation from PyBullet."""
+        if p.isConnected(self.client_id):
+            p.disconnect(physicsClientId=self.client_id)
+
+    def __enter__(self) -> "ManipulatorSimulation":
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *_: object) -> None:
         self.close()

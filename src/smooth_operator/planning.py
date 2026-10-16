@@ -1,90 +1,115 @@
-"""Conservative planar joint-space planning for the scripted demo."""
-import heapq
+"""Collision-aware Cartesian planning for the SCARA workspace."""
+
+from heapq import heappop, heappush
 import math
+from typing import Iterable, Optional, Sequence
 
 import numpy as np
 
 
-class JointPlanner:
-    lengths = (0.40, 0.32)
-    obstacle_center = (0.35, 0.0)
-    obstacle_half = (0.045, 0.065)
-    resolution = 0.10
-    lower = np.array([-math.pi, 0.25])
-    upper = np.array([math.pi, 2.65])
+WORKSPACE = (-0.60, -0.50, 0.60, 0.50)
+OBSTACLES = (
+    (-0.34, 0.13, -0.22, 0.31),
+    (0.23, -0.25, 0.37, -0.11),
+)
 
-    def valid(self, q):
-        if np.any(q < self.lower) or np.any(q > self.upper):
+
+class CartesianAStarPlanner:
+    """Plan an eight-connected path around inflated rectangular obstacles."""
+
+    RESOLUTION = 0.02
+    SAFETY_MARGIN = 0.01
+    WRIST_RADIUS = 0.025
+    BASE_XY = np.asarray((-0.68, 0.0))
+    LINK_LENGTHS = (0.75, 0.70)
+
+    def __init__(
+        self,
+        object_radius: float,
+        obstacles: Iterable[Sequence[float]] = OBSTACLES,
+    ) -> None:
+        self.clearance = max(object_radius, self.WRIST_RADIUS) + self.SAFETY_MARGIN
+        self.obstacles = tuple(tuple(map(float, obstacle)) for obstacle in obstacles)
+
+    def plan(
+        self, start: Sequence[float], goal: Sequence[float]
+    ) -> list[tuple[float, float]]:
+        start_cell = self._cell(start)
+        goal_cell = self._cell(goal)
+        if not self.valid_point(start) or not self.valid_point(goal):
+            raise ValueError("Start or goal is occupied, unreachable, or outside the grid")
+
+        frontier = [(0.0, start_cell)]
+        previous = {start_cell: None}
+        cost = {start_cell: 0.0}
+        while frontier:
+            _, current = heappop(frontier)
+            if current == goal_cell:
+                break
+            for neighbor, step_cost in self._neighbors(current):
+                point = self._point(neighbor)
+                if not self.valid_point(point):
+                    continue
+                new_cost = cost[current] + step_cost
+                if new_cost >= cost.get(neighbor, math.inf):
+                    continue
+                cost[neighbor] = new_cost
+                previous[neighbor] = current
+                heuristic = math.dist(point, self._point(goal_cell))
+                heappush(frontier, (new_cost + heuristic, neighbor))
+
+        if goal_cell not in previous:
+            raise ValueError("No collision-free path exists")
+        cells = []
+        current: Optional[tuple[int, int]] = goal_cell
+        while current is not None:
+            cells.append(current)
+            current = previous[current]
+        cells.reverse()
+        path = [tuple(map(float, start))]
+        path.extend(self._point(cell) for cell in cells[1:-1])
+        path.append(tuple(map(float, goal)))
+        return path
+
+    def valid_point(self, point: Sequence[float]) -> bool:
+        x, y = map(float, point)
+        xmin, ymin, xmax, ymax = WORKSPACE
+        c = self.clearance
+        if not (xmin + c <= x <= xmax - c and ymin + c <= y <= ymax - c):
             return False
-        elbow = self.lengths[0] * np.array([math.cos(q[0]), math.sin(q[0])])
-        tip = elbow + self.lengths[1] * np.array([math.cos(sum(q)), math.sin(sum(q))])
-        # Inflate for link width, tool and the carried box's circumscribed radius,
-        # plus tracking clearance. Applied to both links for conservatism.
-        low = np.array(self.obstacle_center) - self.obstacle_half - 0.05
-        high = np.array(self.obstacle_center) + self.obstacle_half + 0.05
-        for a, b in ((np.zeros(2), elbow), (elbow, tip)):
-            enter, leave = 0.0, 1.0
-            for axis in range(2):
-                delta = b[axis] - a[axis]
-                if abs(delta) < 1e-12:
-                    if a[axis] < low[axis] or a[axis] > high[axis]:
-                        enter, leave = 1.0, 0.0
-                        break
-                else:
-                    t0, t1 = sorted(((low[axis]-a[axis])/delta, (high[axis]-a[axis])/delta))
-                    enter, leave = max(enter, t0), min(leave, t1)
-            if enter <= leave:
-                return False
-        return True
+        radius = float(np.linalg.norm(np.asarray((x, y)) - self.BASE_XY))
+        inner = abs(self.LINK_LENGTHS[0] - self.LINK_LENGTHS[1])
+        outer = sum(self.LINK_LENGTHS)
+        if not inner <= radius <= outer:
+            return False
+        return not any(
+            oxmin - c <= x <= oxmax + c and oymin - c <= y <= oymax + c
+            for oxmin, oymin, oxmax, oymax in self.obstacles
+        )
 
-    def edge_valid(self, a, b):
-        n = max(1, math.ceil(float(np.max(np.abs(b-a))) / 0.02))
-        return all(self.valid(a + (b-a)*i/n) for i in range(n+1))
+    def segment_valid(self, start: Sequence[float], end: Sequence[float]) -> bool:
+        distance = math.dist(start, end)
+        steps = max(1, math.ceil(distance / (self.RESOLUTION / 2.0)))
+        return all(
+            self.valid_point(np.asarray(start) + fraction * (np.asarray(end) - start))
+            for fraction in np.linspace(0.0, 1.0, steps + 1)
+        )
 
-    def plan(self, start, goal):
-        start, goal = np.asarray(start), np.asarray(goal)
-        if not self.valid(start) or not self.valid(goal):
-            raise ValueError("Start or goal violates obstacle clearance or joint bounds")
-        if self.edge_valid(start, goal):
-            return [start, goal]
-        def angles(node):
-            return self.lower + self.resolution*np.array(node)
-        def connector(q):
-            nearest = np.rint((q-self.lower)/self.resolution).astype(int)
-            candidates = [(int(nearest[0]+i), int(nearest[1]+j)) for i in (-1, 0, 1) for j in (-1, 0, 1)]
-            candidates.sort(key=lambda node: np.linalg.norm(angles(node)-q))
-            return next((node for node in candidates if self.edge_valid(q, angles(node))), None)
-        source, target = connector(start), connector(goal)
-        if source is None or target is None:
-            raise ValueError("No safe connection to joint-space grid")
-        queue = [(0.0, source)]
-        costs, parent = {source: 0.0}, {}
-        closed = set()
-        while queue:
-            _, node = heapq.heappop(queue)
-            if node in closed:
-                continue
-            if node == target:
-                nodes = [node]
-                while node in parent:
-                    node = parent[node]
-                    nodes.append(node)
-                path = [start] + [angles(n) for n in reversed(nodes)] + [goal]
-                # Shortcut only when the entire interpolated edge is checked.
-                result, i = [path[0]], 0
-                while i < len(path)-1:
-                    j = len(path)-1
-                    while not self.edge_valid(path[i], path[j]):
-                        j -= 1
-                    result.append(path[j])
-                    i = j
-                return result
-            closed.add(node)
-            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)):
-                neighbor = (node[0]+dx, node[1]+dy)
-                cost = costs[node] + math.hypot(dx, dy)*self.resolution
-                if cost < costs.get(neighbor, math.inf) and self.edge_valid(angles(node), angles(neighbor)):
-                    costs[neighbor], parent[neighbor] = cost, node
-                    estimate = float(np.linalg.norm(angles(neighbor)-angles(target)))
-                    heapq.heappush(queue, (cost+estimate, neighbor))
-        raise ValueError("No collision-free path on the joint-space grid")
+    def _cell(self, point: Sequence[float]) -> tuple[int, int]:
+        return (
+            round((float(point[0]) - WORKSPACE[0]) / self.RESOLUTION),
+            round((float(point[1]) - WORKSPACE[1]) / self.RESOLUTION),
+        )
+
+    def _point(self, cell: tuple[int, int]) -> tuple[float, float]:
+        return (
+            WORKSPACE[0] + cell[0] * self.RESOLUTION,
+            WORKSPACE[1] + cell[1] * self.RESOLUTION,
+        )
+
+    @staticmethod
+    def _neighbors(cell: tuple[int, int]):
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if dx or dy:
+                    yield (cell[0] + dx, cell[1] + dy), math.hypot(dx, dy) * 0.02

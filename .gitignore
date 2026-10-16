@@ -153,6 +153,7 @@ activemq-data/
 .env
 .envrc
 .venv
+.venv*/
 env/
 venv/
 ENV/
@@ -221,3 +222,6 @@ __marimo__/
 
 # Simulation output
 artifacts/
+datasets/
+checkpoints/
+.hf-cache/
