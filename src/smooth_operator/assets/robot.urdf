@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<robot name="elevated_scara">
+  <material name="base"><color rgba="0.18 0.22 0.30 1"/></material>
+  <material name="link1"><color rgba="0.12 0.48 0.75 1"/></material>
+  <material name="link2"><color rgba="0.12 0.72 0.70 1"/></material>
+  <link name="base">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual><origin xyz="0 0 0.18"/><geometry><cylinder radius="0.07" length="0.36"/></geometry><material name="base"/></visual>
+    <collision><origin xyz="0 0 0.18"/><geometry><cylinder radius="0.07" length="0.36"/></geometry></collision>
+  </link>
+  <link name="upper_arm">
+    <inertial><origin xyz="0.375 0 0"/><mass value="0.7"/><inertia ixx="0.0003" ixy="0" ixz="0" iyy="0.033" iyz="0" izz="0.033"/></inertial>
+    <visual><origin xyz="0.375 0 0"/><geometry><box size="0.75 0.045 0.045"/></geometry><material name="link1"/></visual>
+    <collision><origin xyz="0.375 0 0"/><geometry><box size="0.75 0.045 0.045"/></geometry></collision>
+  </link>
+  <joint name="shoulder_yaw" type="revolute">
+    <origin xyz="0 0 0.36"/><parent link="base"/><child link="upper_arm"/>
+    <axis xyz="0 0 1"/><limit lower="-3.14159" upper="3.14159" effort="45" velocity="2"/>
+  </joint>
+  <link name="forearm">
+    <inertial><origin xyz="0.35 0 0"/><mass value="0.55"/><inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0225" iyz="0" izz="0.0225"/></inertial>
+    <visual><origin xyz="0.35 0 0"/><geometry><box size="0.70 0.04 0.04"/></geometry><material name="link2"/></visual>
+    <collision><origin xyz="0.35 0 0"/><geometry><box size="0.70 0.04 0.04"/></geometry></collision>
+  </link>
+  <joint name="elbow_yaw" type="revolute">
+    <origin xyz="0.75 0 0"/><parent link="upper_arm"/><child link="forearm"/>
+    <axis xyz="0 0 1"/><limit lower="-3.14159" upper="3.14159" effort="35" velocity="2.5"/>
+  </joint>
+  <link name="tool">
+    <inertial><mass value="0.08"/><inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00002" iyz="0" izz="0.00002"/></inertial>
+    <visual><origin xyz="0 0 0.15"/><geometry><cylinder radius="0.025" length="0.30"/></geometry><material name="base"/></visual>
+    <visual><geometry><sphere radius="0.03"/></geometry><material name="base"/></visual>
+    <collision><origin xyz="0 0 0.15"/><geometry><cylinder radius="0.025" length="0.30"/></geometry></collision>
+    <collision><geometry><sphere radius="0.03"/></geometry></collision>
+  </link>
+  <joint name="wrist_lift" type="prismatic">
+    <origin xyz="0.70 0 0"/><parent link="forearm"/><child link="tool"/>
+    <axis xyz="0 0 1"/><limit lower="-0.34" upper="0" effort="60" velocity="0.5"/>
+  </joint>
+</robot>

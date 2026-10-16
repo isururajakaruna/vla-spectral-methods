@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<robot name="coke_can">
+  <link name="coke_can">
+    <inertial>
+      <mass value="0.33"/>
+      <inertia ixx="0.00042" ixy="0" ixz="0" iyy="0.00042" iyz="0" izz="0.00015"/>
+    </inertial>
+    <visual>
+      <geometry><cylinder radius="0.033" length="0.115"/></geometry>
+      <material name="can_red"><color rgba="0.78 0.02 0.03 1"/></material>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0.058"/>
+      <geometry><cylinder radius="0.031" length="0.002"/></geometry>
+      <material name="can_silver"><color rgba="0.78 0.80 0.82 1"/></material>
+    </visual>
+    <collision><geometry><cylinder radius="0.033" length="0.115"/></geometry></collision>
+  </link>
+</robot>

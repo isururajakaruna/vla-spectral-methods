@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<robot name="static_grid_environment">
+  <link name="table">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual>
+      <origin xyz="0 0 -0.025"/>
+      <geometry><box size="1.4 1.2 0.05"/></geometry>
+      <material name="table"><color rgba="0.82 0.84 0.87 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.025"/>
+      <geometry><box size="1.4 1.2 0.05"/></geometry>
+    </collision>
+  </link>
+
+  <link name="grid">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual>
+      <origin xyz="0 0 0.001"/>
+      <geometry><box size="1.2 1.0 0.002"/></geometry>
+      <material name="grid"><color rgba="0.92 0.92 0.92 1"/></material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.001"/>
+      <geometry><box size="1.2 1.0 0.002"/></geometry>
+    </collision>
+  </link>
+  <joint name="grid_mount" type="fixed">
+    <parent link="table"/><child link="grid"/>
+  </joint>
+
+  <!-- Grid lines are static URDF visuals; no geometry is generated at runtime. -->
+  <link name="grid_lines">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual><origin xyz="-0.6 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"><color rgba="0.45 0.48 0.52 1"/></material></visual>
+    <visual><origin xyz="-0.5 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="-0.4 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="-0.3 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="-0.2 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="-0.1 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.0 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.1 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.2 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.3 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.4 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.5 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0.6 0 0.003"/><geometry><box size="0.004 1.0 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 -0.5 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 -0.4 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 -0.3 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 -0.2 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 -0.1 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 0.0 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 0.1 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 0.2 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 0.3 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 0.4 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+    <visual><origin xyz="0 0.5 0.003"/><geometry><box size="1.2 0.004 0.002"/></geometry><material name="line"/></visual>
+  </link>
+  <joint name="grid_lines_mount" type="fixed">
+    <parent link="table"/><child link="grid_lines"/>
+  </joint>
+
+  <link name="cell_markers">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual><origin xyz="-0.45 -0.35 0.003"/><geometry><box size="0.096 0.096 0.002"/></geometry><material name="source"><color rgba="0.95 0.58 0.10 1"/></material></visual>
+    <visual><origin xyz="-0.25 -0.35 0.003"/><geometry><box size="0.096 0.096 0.002"/></geometry><material name="source"/></visual>
+    <visual><origin xyz="0.05 -0.35 0.003"/><geometry><box size="0.096 0.096 0.002"/></geometry><material name="source"/></visual>
+    <visual><origin xyz="0.45 0.35 0.003"/><geometry><box size="0.096 0.096 0.002"/></geometry><material name="destination"><color rgba="0.12 0.72 0.32 1"/></material></visual>
+    <visual><origin xyz="-0.45 0.35 0.003"/><geometry><box size="0.096 0.096 0.002"/></geometry><material name="blue_target"><color rgba="0.10 0.35 0.88 1"/></material></visual>
+    <visual><origin xyz="0.45 -0.35 0.003"/><geometry><box size="0.096 0.096 0.002"/></geometry><material name="yellow_target"><color rgba="0.95 0.82 0.10 1"/></material></visual>
+  </link>
+  <joint name="cell_markers_mount" type="fixed">
+    <parent link="table"/><child link="cell_markers"/>
+  </joint>
+
+  <link name="obstacle_left">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual><geometry><box size="0.12 0.18 0.22"/></geometry><material name="obstacle"><color rgba="0.48 0.22 0.65 1"/></material></visual>
+    <collision><geometry><box size="0.12 0.18 0.22"/></geometry></collision>
+  </link>
+  <joint name="obstacle_left_mount" type="fixed">
+    <origin xyz="-0.28 0.22 0.11"/><parent link="table"/><child link="obstacle_left"/>
+  </joint>
+
+  <link name="obstacle_right">
+    <inertial><mass value="0"/><inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/></inertial>
+    <visual><geometry><box size="0.14 0.14 0.28"/></geometry><material name="obstacle"/></visual>
+    <collision><geometry><box size="0.14 0.14 0.28"/></geometry></collision>
+  </link>
+  <joint name="obstacle_right_mount" type="fixed">
+    <origin xyz="0.30 -0.18 0.14"/><parent link="table"/><child link="obstacle_right"/>
+  </joint>
+</robot>
