@@ -18,6 +18,7 @@ def training_command(
     dataset_root: Optional[Path] = None,
     device: str = "mps",
     config_path: Optional[Path] = None,
+    robot: str = "scara",
 ) -> list[str]:
     sibling = Path(sys.executable).with_name("lerobot-train")
     executable = str(sibling) if sibling.exists() else shutil.which("lerobot-train")
@@ -32,8 +33,9 @@ def training_command(
         "--policy.push_to_hub=false",
         f"--dataset.repo_id={dataset_repo}",
         "--dataset.eval_split=0.0",
-        '--rename_map={"observation.images.workspace":"observation.images.camera1"}',
         "--batch_size=1",
+        "--num_workers=0",
+        "--persistent_workers=false",
         "--policy.chunk_size=10",
         "--policy.n_action_steps=10",
         f"--steps={steps}",
@@ -43,6 +45,10 @@ def training_command(
         "--eval_steps=0",
         "--save_freq=1000",
     ]
+    if robot == "scara":
+        command.append(
+            '--rename_map={"observation.images.workspace":"observation.images.camera1"}'
+        )
     if dataset_root is not None:
         command.append(f"--dataset.root={dataset_root}")
     if resume:
@@ -54,14 +60,31 @@ def training_command(
 
 
 def resolve_device(requested: str) -> str:
-    if requested == "cpu":
-        return "cpu"
     import torch
 
-    available = torch.backends.mps.is_available()
-    if requested == "mps" and not available:
+    if requested == "cpu":
+        return "cpu"
+    if requested == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA was requested but is unavailable")
+        return "cuda"
+    if requested == "mps" and not torch.backends.mps.is_available():
         raise RuntimeError("MPS was requested but is unavailable")
-    return "mps" if available else "cpu"
+    if requested == "mps":
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "mps" if torch.backends.mps.is_available() else "cpu"
+
+
+def dataset_robot(dataset_root: Optional[Path], requested: str, repo_id: str) -> str:
+    if requested != "auto":
+        return requested
+    if dataset_root is not None:
+        manifest = dataset_root.parent / "conversion.json"
+        if manifest.exists():
+            return str(json.loads(manifest.read_text()).get("robot", "scara"))
+    return "so101" if "so101" in repo_id.lower() else "scara"
 
 
 def main() -> None:
@@ -72,9 +95,11 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=20000)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--config-path", type=Path)
-    parser.add_argument("--device", choices=("auto", "mps", "cpu"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
+    parser.add_argument("--robot", choices=("auto", "scara", "so101"), default="auto")
     args = parser.parse_args()
     device = resolve_device(args.device)
+    robot = dataset_robot(args.dataset_root, args.robot, args.dataset_repo)
     command = training_command(
         args.dataset_repo,
         args.output,
@@ -83,6 +108,7 @@ def main() -> None:
         args.dataset_root,
         device,
         args.config_path,
+        robot,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     run = {
@@ -90,6 +116,7 @@ def main() -> None:
         "dataset_root": str(args.dataset_root) if args.dataset_root else None,
         "steps": args.steps,
         "device": device,
+        "robot": robot,
         "resumed": args.resume,
         "started_at": time.time(),
     }

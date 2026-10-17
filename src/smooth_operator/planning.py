@@ -27,9 +27,21 @@ class CartesianAStarPlanner:
         self,
         object_radius: float,
         obstacles: Iterable[Sequence[float]] = OBSTACLES,
+        workspace: Sequence[float] = WORKSPACE,
+        base_xy: Sequence[float] = BASE_XY,
+        link_lengths: Sequence[float] = LINK_LENGTHS,
+        resolution: float = RESOLUTION,
     ) -> None:
         self.clearance = max(object_radius, self.WRIST_RADIUS) + self.SAFETY_MARGIN
         self.obstacles = tuple(tuple(map(float, obstacle)) for obstacle in obstacles)
+        self.workspace = tuple(map(float, workspace))
+        self.base_xy = np.asarray(base_xy, dtype=float)
+        self.link_lengths = tuple(map(float, link_lengths))
+        self.resolution = float(resolution)
+        if len(self.workspace) != 4 or len(self.link_lengths) != 2:
+            raise ValueError("Invalid planner geometry")
+        if self.resolution <= 0.0:
+            raise ValueError("Planner resolution must be positive")
 
     def plan(
         self, start: Sequence[float], goal: Sequence[float]
@@ -73,13 +85,13 @@ class CartesianAStarPlanner:
 
     def valid_point(self, point: Sequence[float]) -> bool:
         x, y = map(float, point)
-        xmin, ymin, xmax, ymax = WORKSPACE
+        xmin, ymin, xmax, ymax = self.workspace
         c = self.clearance
         if not (xmin + c <= x <= xmax - c and ymin + c <= y <= ymax - c):
             return False
-        radius = float(np.linalg.norm(np.asarray((x, y)) - self.BASE_XY))
-        inner = abs(self.LINK_LENGTHS[0] - self.LINK_LENGTHS[1])
-        outer = sum(self.LINK_LENGTHS)
+        radius = float(np.linalg.norm(np.asarray((x, y)) - self.base_xy))
+        inner = abs(self.link_lengths[0] - self.link_lengths[1])
+        outer = sum(self.link_lengths)
         if not inner <= radius <= outer:
             return False
         return not any(
@@ -89,7 +101,7 @@ class CartesianAStarPlanner:
 
     def segment_valid(self, start: Sequence[float], end: Sequence[float]) -> bool:
         distance = math.dist(start, end)
-        steps = max(1, math.ceil(distance / (self.RESOLUTION / 2.0)))
+        steps = max(1, math.ceil(distance / (self.resolution / 2.0)))
         return all(
             self.valid_point(np.asarray(start) + fraction * (np.asarray(end) - start))
             for fraction in np.linspace(0.0, 1.0, steps + 1)
@@ -97,19 +109,21 @@ class CartesianAStarPlanner:
 
     def _cell(self, point: Sequence[float]) -> tuple[int, int]:
         return (
-            round((float(point[0]) - WORKSPACE[0]) / self.RESOLUTION),
-            round((float(point[1]) - WORKSPACE[1]) / self.RESOLUTION),
+            round((float(point[0]) - self.workspace[0]) / self.resolution),
+            round((float(point[1]) - self.workspace[1]) / self.resolution),
         )
 
     def _point(self, cell: tuple[int, int]) -> tuple[float, float]:
         return (
-            WORKSPACE[0] + cell[0] * self.RESOLUTION,
-            WORKSPACE[1] + cell[1] * self.RESOLUTION,
+            self.workspace[0] + cell[0] * self.resolution,
+            self.workspace[1] + cell[1] * self.resolution,
         )
 
-    @staticmethod
-    def _neighbors(cell: tuple[int, int]):
+    def _neighbors(self, cell: tuple[int, int]):
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
                 if dx or dy:
-                    yield (cell[0] + dx, cell[1] + dy), math.hypot(dx, dy) * 0.02
+                    yield (
+                        cell[0] + dx,
+                        cell[1] + dy,
+                    ), math.hypot(dx, dy) * self.resolution

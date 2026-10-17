@@ -56,7 +56,7 @@ class ManipulatorSimulation:
             if training_seed is not None:
                 self._randomize_training_scene(training_seed)
             self.collision_count = 0
-            self.command_joints((0.0, 0.0, 0.0))
+            self.command_joints(np.zeros(self.JOINT_COUNT))
         except Exception:
             self.close()
             raise

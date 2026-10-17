@@ -20,9 +20,10 @@ smooth-operator-convert = "smooth_operator.dataset:main"
 smooth-operator-train = "smooth_operator.training:main"
 smooth-operator-evaluate = "smooth_operator.evaluation:main"
 smooth-operator-inference-server = "smooth_operator.inference_server:main"
+smooth-operator-compare = "smooth_operator.comparison:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-smooth_operator = ["assets/*.urdf"]
+smooth_operator = ["assets/*.urdf", "assets/so101/*.urdf", "assets/so101/LICENSE", "assets/so101/assets/*.stl"]

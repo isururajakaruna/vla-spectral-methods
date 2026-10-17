@@ -9,7 +9,7 @@ import numpy as np
 
 from smooth_operator.dataset import validate_raw_episode
 from smooth_operator.raw_dataset import split_for_seed
-from smooth_operator.training import training_command
+from smooth_operator.training import dataset_robot, training_command
 
 
 class DatasetTests(unittest.TestCase):
@@ -41,6 +41,27 @@ class DatasetTests(unittest.TestCase):
             self.assertEqual(loaded["split"], "train")
             self.assertEqual(arrays["actions"].shape, (2, 4))
 
+    def test_so101_raw_episode_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            metadata = {
+                "robot": "so101", "fps": 30, "split": "train",
+                "prompt": "Move the apple to the target",
+                "metrics": {"collision_count": 0},
+            }
+            (path / "metadata.json").write_text(json.dumps(metadata))
+            images = np.zeros((2, 256, 256, 3), dtype=np.uint8)
+            np.savez_compressed(
+                path / "frames.npz", camera1=images, camera2=images,
+                camera3=images, states=np.zeros((2, 6), dtype=np.float32),
+                actions=np.zeros((2, 6), dtype=np.float32),
+                timestamps=np.asarray((0.0, 1 / 30)),
+            )
+            loaded, arrays = validate_raw_episode(path)
+            self.assertEqual(loaded["robot"], "so101")
+            self.assertEqual(arrays["camera3"].shape, (2, 256, 256, 3))
+            self.assertEqual(arrays["actions"].shape, (2, 6))
+
     @patch("smooth_operator.training.shutil.which", return_value="/bin/lerobot-train")
     def test_training_configuration(self, _):
         command = training_command(
@@ -55,6 +76,19 @@ class DatasetTests(unittest.TestCase):
             command,
         )
         self.assertIn("--resume=true", command)
+
+    @patch("smooth_operator.training.shutil.which", return_value="/bin/lerobot-train")
+    def test_so101_training_keeps_three_camera_keys(self, _):
+        command = training_command(
+            "local/smooth_operator_so101_train", Path("out"), 20, False,
+            device="cuda", robot="so101",
+        )
+        self.assertIn("--policy.device=cuda", command)
+        self.assertFalse(any(value.startswith("--rename_map=") for value in command))
+        self.assertEqual(
+            dataset_robot(None, "auto", "local/smooth_operator_so101_train"),
+            "so101",
+        )
 
 
 if __name__ == "__main__":

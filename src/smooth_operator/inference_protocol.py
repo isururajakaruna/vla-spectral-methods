@@ -5,6 +5,7 @@ import json
 import socket
 import struct
 import zlib
+from typing import Mapping
 
 import numpy as np
 
@@ -50,7 +51,41 @@ def encode_request(image: np.ndarray, state: np.ndarray, prompt: str) -> dict:
     }
 
 
-def decode_request(message: dict) -> tuple[np.ndarray, np.ndarray, str]:
+def encode_multi_request(
+    images: Mapping[str, np.ndarray], state: np.ndarray, prompt: str
+) -> dict:
+    if not images:
+        raise ValueError("Inference request requires at least one camera")
+    encoded = {}
+    for key, value in images.items():
+        image = np.asarray(value, dtype=np.uint8)
+        if image.ndim != 3 or image.shape[2] != 3:
+            raise ValueError(f"Inference camera {key!r} must be RGB")
+        encoded[key] = {
+            "shape": list(image.shape),
+            "data": base64.b64encode(zlib.compress(image.tobytes())).decode("ascii"),
+        }
+    return {
+        "images": encoded,
+        "state": np.asarray(state, dtype=float).tolist(),
+        "prompt": prompt,
+    }
+
+
+def decode_request(message: dict):
+    if "images" in message:
+        images = {}
+        for key, encoded in message["images"].items():
+            shape = tuple(int(value) for value in encoded["shape"])
+            data = zlib.decompress(base64.b64decode(encoded["data"]))
+            image = np.frombuffer(data, dtype=np.uint8).reshape(shape)
+            if image.ndim != 3 or image.shape[2] != 3:
+                raise ValueError("Invalid inference camera shape")
+            images[str(key)] = image
+        state = np.asarray(message["state"], dtype=np.float32)
+        if state.ndim != 1 or state.size < 1:
+            raise ValueError("Invalid inference state shape")
+        return images, state, str(message["prompt"])
     shape = tuple(int(value) for value in message["image_shape"])
     data = zlib.decompress(base64.b64decode(message["image"]))
     image = np.frombuffer(data, dtype=np.uint8).reshape(shape)
@@ -65,7 +100,12 @@ class SocketActionChunkPolicy:
         self.connection = socket.create_connection((host, port), timeout=timeout)
 
     def predict_action_chunk(self, image, state, instruction) -> np.ndarray:
-        send_message(self.connection, encode_request(image, state, instruction))
+        request = (
+            encode_multi_request(image, state, instruction)
+            if isinstance(image, Mapping)
+            else encode_request(image, state, instruction)
+        )
+        send_message(self.connection, request)
         response = receive_message(self.connection)
         if "error" in response:
             raise RuntimeError(response["error"])

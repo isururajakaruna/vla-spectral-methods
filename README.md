@@ -1,6 +1,6 @@
 # Smooth Operator
 
-Smooth Operator studies whether a learned Vision-Language-Action (VLA) policy can reproduce and later smooth collision-free robot motion. The simulator uses a three-joint SCARA arm (two planar revolute joints and one vertical prismatic wrist) to move an Apple, Coke can, or Pen through randomized grid obstacles. An unsmoothed, eight-connected A* trajectory is the expert and comparison baseline.
+Smooth Operator studies whether a learned Vision-Language-Action (VLA) policy can reproduce and later smooth collision-free robot motion. It includes the original three-joint SCARA experiment and an official SO-101 arm for fine-tuning `lerobot/smolvla_base`. Both move an Apple, Coke can, or Pen through grid obstacles; unsmoothed eight-connected A* is the comparison baseline.
 
 ## Current flow and status
 
@@ -13,16 +13,17 @@ Natural-language task + RGB image + robot state
               /                       \
        action is safe             action is unsafe
               |                       |
-       execute SmolVLA        stop and fall back to A*
+       execute SmolVLA          stop and report failure
 ```
 
-The Python 3.9 simulator generates collision-free A* demonstrations at 10 Hz. Each frame contains the workspace RGB image, instruction, joint state `[shoulder, elbow, wrist, gripper]`, and the corresponding absolute action. A Python 3.12 process converts these episodes to LeRobot format, trains SmolVLA, and serves inference to the simulator over a local socket.
+The Python 3.9 simulator generates collision-free A* demonstrations. SO-101 episodes contain three `256×256` RGB observations and calibrated six-dimensional states/actions at 30 Hz. A Python 3.12 process converts these episodes to LeRobot format, trains SmolVLA, and serves inference to the simulator over a local socket.
 
 Completed so far:
 
 - Collision-aware low-height 2D manipulation, randomized objects and rectangular obstacles, A* planning, safety validation, metrics, and trajectory graphs.
-- 600 valid demonstrations generated and converted: 468 training, 71 validation, and 61 held-out evaluation episodes.
+- 600 valid SCARA demonstrations generated and converted: 468 training, 71 validation, and 61 held-out evaluation episodes.
 - The SmolVLA download, conversion, training, and socket pipelines have passed smoke tests.
+- The SO-101 path supplies the model's native six-dimensional state/action interface plus overhead, wrist, and side cameras. It supports matched A* and learned-only runs without safety fallback hiding model failures.
 
 SmolVLA has **not yet been fully trained on the 600 episodes**. Only a one-step CPU training smoke test was completed, so the present learned checkpoint should not be used for a performance comparison.
 
@@ -55,6 +56,34 @@ All commands below are the installed console commands and are independent of the
 
 ## Run and produce graphs
 
+Run the matched SO-101 A* baseline:
+
+```bash
+smooth-operator --robot so101 --controller astar --seed 42 --prompt "Move the apple to the target" --chart artifacts/so101_astar.png --result artifacts/so101_astar.json
+```
+
+For SmolVLA, start the Python 3.12 inference server with the trained checkpoint:
+
+```bash
+smooth-operator-inference-server --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --device auto
+```
+
+Then run the same scene and prompt from the Python 3.9 simulation environment:
+
+```bash
+smooth-operator --robot so101 --controller smolvla --learned-only --seed 42 --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --prompt "Move the apple to the target" --chart artifacts/so101_smolvla.png --result artifacts/so101_smolvla.json
+```
+
+Run a matched multi-seed comparison while the server is running:
+
+```bash
+smooth-operator-compare --episodes 5 --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --charts artifacts/so101-comparison --output artifacts/so101-comparison.json
+```
+
+This produces per-controller trajectory and joint graphs, raw learned actions, failures, aggregate success and collision rates, endpoint error, path length, jerk, and inference-versus-planning latency. SmolVLA is evaluated without A* fallback; a rejected action is recorded as a learned failure.
+
+The original SCARA commands remain available:
+
 Run the deterministic baseline and save its result plus a graph of X/Y position, planar speed, and the XY path around obstacles:
 
 ```bash
@@ -85,46 +114,47 @@ The PNG files show the current unsmoothed baseline and expose abrupt changes at 
 
 ## Data, training, and learned evaluation
 
-Generate more expert episodes in Python 3.9, then convert them in Python 3.12:
+Generate a pilot and full SO-101 expert dataset in Python 3.9, then convert it in Python 3.12:
 
 ```bash
-smooth-operator-generate-raw --episodes 600 --output datasets/raw-600
+smooth-operator-generate-raw --robot so101 --episodes 50 --output datasets/so101-pilot
+smooth-operator-generate-raw --robot so101 --episodes 600 --output datasets/so101-raw-600
 
-smooth-operator-convert --input datasets/raw-600 --output datasets/lerobot-600 --repo-id local/smooth_operator
+smooth-operator-convert --input datasets/so101-raw-600 --output datasets/so101-lerobot --repo-id local/smooth_operator_so101
 ```
 
 Fine-tune on the converted training split:
 
 ```bash
-smooth-operator-train --dataset-repo local/smooth_operator_train --dataset-root datasets/lerobot-600/train --output checkpoints/smolvla --steps 20000 --device cpu
+smooth-operator-train --dataset-repo local/smooth_operator_so101_train --dataset-root datasets/so101-lerobot/train --output checkpoints/so101-smolvla --steps 20000 --device auto
 ```
 
-Use `--device mps` instead of `--device cpu` on a compatible Apple system. Model files are cached in the default Hugging Face cache unless `HF_HOME` is configured for the shell.
+`--device auto` selects CUDA, then MPS, then CPU. Model files are cached in the default Hugging Face cache unless `HF_HOME` is configured for the shell.
 
 After training, start inference in the Python 3.12 terminal:
 
 ```bash
-smooth-operator-inference-server --checkpoint checkpoints/smolvla/checkpoints/last/pretrained_model --device cpu
+smooth-operator-inference-server --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --device auto
 ```
 
-Then evaluate from a second, Python 3.9 terminal:
+Then run the matched SO-101 comparison from a second, Python 3.9 terminal:
 
 ```bash
-smooth-operator-evaluate --controller smolvla --episodes 100 --checkpoint checkpoints/smolvla/checkpoints/last/pretrained_model --output artifacts/smolvla_evaluation.json
+smooth-operator-compare --episodes 5 --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --charts artifacts/so101-comparison --output artifacts/so101-comparison.json
 ```
 
 For an individual learned prompt, keep the inference server running and execute this in the simulation environment:
 
 ```bash
-smooth-operator --prompt "Carry the Coke can to the destination" --controller smolvla --checkpoint checkpoints/smolvla/checkpoints/last/pretrained_model --result artifacts/smolvla_prompt.json
+smooth-operator --robot so101 --prompt "Carry the Coke can to the destination" --controller smolvla --learned-only --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --result artifacts/so101-smolvla-prompt.json
 ```
 
 ## Next steps
 
-1. **Train the 600-episode dataset on suitable compute.** The current machine reported MPS as unavailable; the measured CPU rate implies roughly 92 hours for 20,000 steps. A working Apple MPS setup would make iteration practical. The training wrapper must gain CUDA device support before using an NVIDIA GPU.
-2. **Select and evaluate checkpoints.** Add validation-based checkpoint selection, then measure learned-only success, fallback rate, collision-free success, prompt success, latency, path length, and jerk on held-out seeds.
+1. **Generate and train the SO-101 dataset on suitable compute.** The existing 600 episodes belong to SCARA and remain archived. Use CUDA for the full SO-101 run where available.
+2. **Select and evaluate checkpoints.** Measure learned-only success, collision-free success, prompt success, latency, path length, and jerk on held-out seeds.
 3. **Collect failure-focused data.** Add unsuccessful objects, prompts, destinations, and obstacle layouts to the dataset and resume training until learned-only completion reaches the target.
-4. **Generate direct comparison plots.** Plot A*, learned-only, and fallback trajectories together, including velocity, acceleration, jerk, and aggregate success metrics.
+4. **Compare A* and learned-only SmolVLA.** Use identical prompts and seeds and retain the trajectory, joint, velocity, acceleration, jerk, endpoint, and aggregate success outputs.
 5. **Implement frequency-domain conditioning.** Use the unsmoothed A* demonstrations as the baseline, suppress undesirable high-frequency action components, retrain or condition the policy, and compare smoothness without reducing task or collision-free success.
 
 Datasets, model weights, checkpoints, and generated artifacts stay outside source control because they are large and machine-specific.
