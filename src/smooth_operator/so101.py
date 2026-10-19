@@ -365,6 +365,8 @@ class SO101AStarController:
         grasp[5] = self.GRIPPER_CLOSED
         self._move(grasp, 6)
         self.simulation.attach_object(object_name)
+        # Smoothly lift object into the closed gripper jaws during carry
+        self.simulation._attachment_offset[2] = 0.020
         carry = self.inverse_kinematics((*source[:2], self.TRANSPORT_Z), grasp)
         carry[5] = self.GRIPPER_CLOSED
         self._move(carry, 12)

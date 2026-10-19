@@ -1,4 +1,4 @@
-"""Generate portable expert episodes with the Python 3.9 simulator."""
+"""Scope 3: Generate portable Golden Expert Episodes with embedded PyBullet SceneSpecs."""
 
 import argparse
 import json
@@ -6,13 +6,17 @@ from pathlib import Path
 import random
 import shutil
 import tempfile
+from typing import Any
 
 import numpy as np
+import pybullet as p
 
+from .metrics import compute_comprehensive_metrics
 from .motion import BasicPickPlaceController
 from .planning import CartesianAStarPlanner, WORKSPACE
 from .simulation import ManipulatorSimulation
 from .so101 import SO101AStarController, SO101Simulation
+from .spectrum import dct_ii
 
 
 OBJECT_LABELS = {"apple": "apple", "coke_can": "Coke can", "pen": "pen"}
@@ -95,7 +99,7 @@ def _valid_destination(simulation: ManipulatorSimulation, object_name: str, seed
 
 def _relation_task(
     simulation: ManipulatorSimulation, object_name: str, rng: random.Random
-) -> tuple[tuple[float, float], str]:
+) -> tuple[tuple[float, float], str, str, str]:
     anchors = [name for name in simulation.object_ids if name != object_name]
     anchor = rng.choice(anchors)
     relation, offset = rng.choice(tuple(RELATIONS.items()))
@@ -111,7 +115,22 @@ def _relation_task(
         relation=relation,
         anchor=OBJECT_LABELS[anchor],
     )
-    return destination, prompt
+    return destination, prompt, anchor, relation
+
+
+def _precompute_dct_chunks(actions: np.ndarray, chunk_size: int = 10) -> np.ndarray:
+    """Compute 10-step sliding or non-overlapping DCT-II coefficients across an episode."""
+    arr = np.asarray(actions, dtype=float)
+    n, d = arr.shape
+    chunks = []
+    for start in range(0, n, chunk_size):
+        window = arr[start : start + chunk_size]
+        if len(window) < chunk_size:
+            pad = np.repeat(window[-1:, :], chunk_size - len(window), axis=0)
+            window = np.vstack([window, pad])
+        centered = window - window[0:1, :]
+        chunks.append(dct_ii(centered))
+    return np.stack(chunks, axis=0).astype(np.float32) if chunks else np.zeros((0, chunk_size, d), dtype=np.float32)
 
 
 def _save_episode(root: Path, index: int, frames: list[dict], metadata: dict) -> None:
@@ -121,7 +140,13 @@ def _save_episode(root: Path, index: int, frames: list[dict], metadata: dict) ->
         states = np.stack([frame["observation.state"] for frame in frames]).astype(np.float32)
         actions = np.stack([frame["action"] for frame in frames]).astype(np.float32)
         timestamps = np.arange(len(frames), dtype=np.float64) / float(metadata["fps"])
-        arrays = {"states": states, "actions": actions, "timestamps": timestamps}
+        dct_chunks = _precompute_dct_chunks(actions, chunk_size=10)
+        arrays: dict[str, Any] = {
+            "states": states,
+            "actions": actions,
+            "timestamps": timestamps,
+            "dct_coeffs": dct_chunks,
+        }
         if metadata.get("robot") == "so101":
             for name in ("camera1", "camera2", "camera3"):
                 key = f"observation.images.{name}"
@@ -132,7 +157,10 @@ def _save_episode(root: Path, index: int, frames: list[dict], metadata: dict) ->
             )
         np.savez_compressed(temporary / "frames.npz", **arrays)
         (temporary / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
-        temporary.rename(root / f"episode_{index:06d}")
+        target_dir = root / f"episode_{index:06d}"
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        temporary.rename(target_dir)
     except Exception:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
@@ -155,15 +183,30 @@ def generate_raw_episodes(
         rng = random.Random(seed)
         try:
             with simulation_type(training_seed=seed) as simulation:
+                # Snapshot exact initial object poses before moving anything
+                initial_poses = {}
+                for obj_key, body_id in simulation.object_ids.items():
+                    pos, orn = p.getBasePositionAndOrientation(
+                        body_id, physicsClientId=simulation.client_id
+                    )
+                    initial_poses[obj_key] = {
+                        "xyz": [float(v) for v in pos],
+                        "orn_xyzw": [float(v) for v in orn],
+                    }
+
                 object_name = rng.choice(tuple(simulation.object_ids))
                 source = simulation.object_position(simulation.object_ids[object_name])[:2]
+                anchor_name = None
+                relation_name = None
                 if (seed // 10 + seed) % 2 == 0:
                     destination = _valid_destination(simulation, object_name, seed)
                     simulation.set_goal_marker(destination)
                     prompt = rng.choice(TARGET_PROMPTS).format(object=OBJECT_LABELS[object_name])
                     task_type = "target"
                 else:
-                    destination, prompt = _relation_task(simulation, object_name, rng)
+                    destination, prompt, anchor_name, relation_name = _relation_task(
+                        simulation, object_name, rng
+                    )
                     task_type = "spatial_relation"
                 controller = (
                     SO101AStarController(simulation, record_demonstration=True)
@@ -173,11 +216,54 @@ def generate_raw_episodes(
                 metrics = controller.move_object(object_name, destination)
                 if not controller.demonstration or metrics.get("collision_count", 1) != 0:
                     raise ValueError("Expert episode was incomplete or collided")
+
+                fps = 30 if robot == "so101" else 10
+                obj_samples = controller.samples if robot == "so101" else controller.trajectory
+                joint_samples = (
+                    controller.joint_samples
+                    if robot == "so101"
+                    else [frame["action"][:3].tolist() for frame in controller.demonstration]
+                )
+                final_xyz = simulation.object_position(simulation.object_ids[object_name])
+                oracle_comp = compute_comprehensive_metrics(
+                    object_samples=obj_samples,
+                    joint_samples=joint_samples,
+                    ee_samples=None,
+                    destination_xy=destination,
+                    final_object_xyz=final_xyz,
+                    collision_count=0.0,
+                    task_success=True,
+                    hz=float(fps),
+                    chunk_size=10,
+                    arm_joint_count=5 if robot == "so101" else 2,
+                )
+                oracle_metrics = {
+                    k: v
+                    for k, v in oracle_comp.items()
+                    if k not in ("psd_freqs_hz", "psd_power")
+                }
+                oracle_metrics["planning_time_s"] = float(metrics.get("planning_time_s", 0.0))
+
                 split = split_for_seed(seed)
+                workspace_bounds = (
+                    list(SO101Simulation.WORKSPACE) if robot == "so101" else list(WORKSPACE)
+                )
+                scene_spec = {
+                    "robot_base_xyz": list(simulation.ROBOT_BASE),
+                    "environment_scale": getattr(simulation, "ENVIRONMENT_SCALE", 1.0),
+                    "workspace_bounds": workspace_bounds,
+                    "initial_object_poses": initial_poses,
+                    "obstacles": [list(bounds) for bounds in simulation.obstacle_bounds],
+                    "target_object": object_name,
+                    "anchor_object": anchor_name,
+                    "relation": relation_name,
+                    "destination_xy": list(map(float, destination)),
+                }
                 metadata = {
-                    "schema_version": 2 if robot == "so101" else 1,
+                    "schema_version": 3,
+                    "episode_index": completed,
                     "robot": robot,
-                    "fps": 30 if robot == "so101" else 10,
+                    "fps": fps,
                     "seed": seed,
                     "split": split,
                     "prompt": prompt,
@@ -186,7 +272,10 @@ def generate_raw_episodes(
                     "source": list(map(float, source)),
                     "destination": list(map(float, destination)),
                     "obstacles": [list(bounds) for bounds in simulation.obstacle_bounds],
+                    "scene_spec": scene_spec,
                     "metrics": metrics,
+                    "oracle_metrics": oracle_metrics,
+                    "oracle_trajectory": [list(map(float, row)) for row in obj_samples],
                 }
                 _save_episode(root, completed, controller.demonstration, metadata)
                 counts[split] += 1
@@ -195,7 +284,7 @@ def generate_raw_episodes(
             pass
         seed += 1
     manifest = {
-        "schema_version": 2 if robot == "so101" else 1,
+        "schema_version": 3,
         "episodes": completed,
         "attempts": attempts,
         "start_seed": start_seed,

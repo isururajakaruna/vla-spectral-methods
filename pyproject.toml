@@ -14,10 +14,13 @@ vla = ["lerobot[smolvla,training]>=0.6.1; python_version >= '3.12'"]
 
 [project.scripts]
 smooth-operator = "smooth_operator.demo:main"
+smooth-operator-run = "smooth_operator.pipeline:main"
+smooth-operator-eval-matrix = "smooth_operator.eval_matrix:main"
 smooth-operator-generate = "smooth_operator.dataset:main"
 smooth-operator-generate-raw = "smooth_operator.raw_dataset:main"
 smooth-operator-convert = "smooth_operator.dataset:main"
 smooth-operator-train = "smooth_operator.training:main"
+smooth-operator-train-spectrum-fit = "smooth_operator.training:fit_spectrum_main"
 smooth-operator-evaluate = "smooth_operator.evaluation:main"
 smooth-operator-inference-server = "smooth_operator.inference_server:main"
 smooth-operator-compare = "smooth_operator.comparison:main"
