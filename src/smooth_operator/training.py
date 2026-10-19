@@ -116,7 +116,7 @@ def training_command(
     steps: int,
     resume: bool,
     dataset_root: Optional[Path] = None,
-    device: str = "mps",
+    device: str = "cuda",
     config_path: Optional[Path] = None,
     robot: str = "scara",
 ) -> list[str]:

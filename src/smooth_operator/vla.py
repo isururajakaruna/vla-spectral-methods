@@ -97,7 +97,7 @@ class ActionChunkPolicy(Protocol):
 class SmolVLAPolicy:
     """Lazy adapter around a locally cached LeRobot SmolVLA checkpoint."""
 
-    def __init__(self, checkpoint: str, device: str = "mps") -> None:
+    def __init__(self, checkpoint: str, device: str = "auto") -> None:
         try:
             import torch
             from lerobot.policies import make_pre_post_processors
@@ -107,6 +107,12 @@ class SmolVLAPolicy:
                 "SmolVLA requires Python 3.12 and `pip install 'lerobot[smolvla]'`"
             ) from error
         self.torch = torch
+        if device == "auto":
+            device = (
+                "cuda"
+                if torch.cuda.is_available()
+                else ("mps" if torch.backends.mps.is_available() else "cpu")
+            )
         self.device = torch.device(device)
         self.model = Policy.from_pretrained(checkpoint).to(self.device).eval()
         self.preprocess, self.postprocess = make_pre_post_processors(

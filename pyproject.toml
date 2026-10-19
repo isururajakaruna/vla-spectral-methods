@@ -14,6 +14,7 @@ vla = ["lerobot[smolvla,training]>=0.6.1; python_version >= '3.12'"]
 
 [project.scripts]
 smooth-operator = "smooth_operator.demo:main"
+smooth-operator-web = "smooth_operator.webapp:main"
 smooth-operator-run = "smooth_operator.pipeline:main"
 smooth-operator-eval-matrix = "smooth_operator.eval_matrix:main"
 smooth-operator-generate = "smooth_operator.dataset:main"

@@ -193,6 +193,48 @@ class EndToEndScopesTests(unittest.TestCase):
             self.assertTrue((eval_dir / "eval_summary.csv").exists())
             self.assertTrue((eval_dir / "summary_matrix.png").exists())
 
+    def test_webapp_catalog_preview_and_headless_launch(self):
+        from smooth_operator.webapp import (
+            ARRANGEMENT_CATALOG,
+            MODEL_CATALOG,
+            build_arrangement_preview,
+            execute_web_launch,
+        )
+
+        # Ensure both Time-Domain and Frequency-Domain models exist
+        td_models = MODEL_CATALOG["time_domain"]
+        fd_models = MODEL_CATALOG["frequency_domain"]
+        self.assertGreaterEqual(len(td_models), 2)
+        self.assertGreaterEqual(len(fd_models), 4)
+        self.assertGreaterEqual(len(ARRANGEMENT_CATALOG), 3)
+
+        # Verify arrangement preview renders schematic + live camera views + objects
+        preview = build_arrangement_preview("so101_seed_9")
+        self.assertIn("schematic_image", preview)
+        self.assertTrue(preview["schematic_image"].startswith("data:image/png;base64,"))
+        self.assertEqual(len(preview["camera_images"]), 3)
+        self.assertGreaterEqual(len(preview["objects"]), 3)
+        self.assertGreaterEqual(len(preview["prompts"]), 4)
+
+        # Verify headless launch returns live telemetry and spectral chart
+        launch_out = execute_web_launch(
+            {
+                "arrangement_id": "so101_seed_9",
+                "model": "astar_oracle",
+                "fast_tokenization": True,
+                "spectrum_schema": "custom_hybrid",
+                "freq_band": "0.0,0.40",
+                "quant_scale": 50.0,
+                "prompt": "Move the apple to the target",
+                "open_gui": False,
+                "hold_seconds": 1.0,
+            }
+        )
+        self.assertEqual(launch_out["status"], "ok")
+        self.assertTrue(launch_out["metrics"]["task_success"])
+        self.assertGreater(launch_out["metrics"]["max_vertical_lift_cm"], 2.0)
+        self.assertTrue(launch_out["diagnostic_chart"].startswith("data:image/png;base64,"))
+
 
 if __name__ == "__main__":
     unittest.main()

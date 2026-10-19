@@ -1,10 +1,38 @@
 """PyBullet lifecycle and joint control for the manipulator simulation."""
 
+import os
+import pkgutil
 from pathlib import Path
+import shutil
+import subprocess
 from typing import Optional, Sequence
 
 import numpy as np
 import pybullet as p
+
+
+_GPU_PROBE_CACHE: Optional[bool] = None
+
+
+def _has_working_nvidia_gpu() -> bool:
+    """Return True if an NVIDIA GPU is present and operational, otherwise False for automatic CPU fallback."""
+    global _GPU_PROBE_CACHE
+    if _GPU_PROBE_CACHE is not None:
+        return _GPU_PROBE_CACHE
+    nvidia_smi = shutil.which("nvidia-smi")
+    if not nvidia_smi:
+        _GPU_PROBE_CACHE = False
+        return False
+    try:
+        out = subprocess.check_output(
+            [nvidia_smi, "--query-gpu=name", "--format=csv,noheader"],
+            text=True,
+            timeout=2.0,
+        ).strip()
+        _GPU_PROBE_CACHE = bool(out)
+    except Exception:
+        _GPU_PROBE_CACHE = False
+    return _GPU_PROBE_CACHE
 
 
 ASSET_DIR = Path(__file__).with_name("assets")
@@ -24,9 +52,26 @@ class ManipulatorSimulation:
 
     def __init__(self, gui: bool = False, training_seed: Optional[int] = None) -> None:
         self.gui = gui
+        if gui and _has_working_nvidia_gpu():
+            os.environ.setdefault("__NV_PRIME_RENDER_OFFLOAD", "1")
+            os.environ.setdefault("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
         self.client_id = p.connect(p.GUI if gui else p.DIRECT)
         if self.client_id < 0:
             raise RuntimeError("Could not connect to PyBullet")
+        self._egl_plugin: Optional[int] = None
+        if not gui and _has_working_nvidia_gpu():
+            try:
+                egl = pkgutil.get_loader("eglRenderer")
+                if egl is not None:
+                    plugin_id = p.loadPlugin(
+                        egl.get_filename(),
+                        "_eglRendererPlugin",
+                        physicsClientId=self.client_id,
+                    )
+                    if plugin_id >= 0:
+                        self._egl_plugin = plugin_id
+            except Exception:
+                self._egl_plugin = None
 
         try:
             self._configure_physics()
@@ -72,6 +117,18 @@ class ManipulatorSimulation:
         if self.gui:
             p.configureDebugVisualizer(
                 p.COV_ENABLE_RENDERING, 0, physicsClientId=self.client_id
+            )
+            p.configureDebugVisualizer(
+                p.COV_ENABLE_GUI, 0, physicsClientId=self.client_id
+            )
+            p.configureDebugVisualizer(
+                p.COV_ENABLE_RGB_BUFFER_PREVIEW, 0, physicsClientId=self.client_id
+            )
+            p.configureDebugVisualizer(
+                p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0, physicsClientId=self.client_id
+            )
+            p.configureDebugVisualizer(
+                p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, 0, physicsClientId=self.client_id
             )
 
     def _load_assets(self) -> tuple[int, int]:
@@ -270,6 +327,12 @@ class ManipulatorSimulation:
             dtype=float,
         )
 
+    @property
+    def camera_renderer(self) -> int:
+        if self.gui or self._egl_plugin is not None:
+            return p.ER_BULLET_HARDWARE_OPENGL
+        return p.ER_TINY_RENDERER
+
     def camera_observation(self, width: int = 320, height: int = 240) -> np.ndarray:
         """Capture an RGB observation of the complete workspace."""
         if width < 1 or height < 1:
@@ -290,7 +353,7 @@ class ManipulatorSimulation:
             height,
             viewMatrix=view,
             projectionMatrix=projection,
-            renderer=p.ER_TINY_RENDERER,
+            renderer=self.camera_renderer,
             physicsClientId=self.client_id,
         )[2]
         return np.asarray(image, dtype=np.uint8).reshape(height, width, 4)[:, :, :3]
@@ -337,6 +400,12 @@ class ManipulatorSimulation:
         self.attached_object = None
         self._attachment_height = None
 
+    def _attached_object_pose(self) -> tuple[np.ndarray, Sequence[float]]:
+        position = self.tool_position() - self._attachment_offset
+        if self._attachment_height is not None:
+            position[2] = self._attachment_height
+        return position, self._attachment_orientation
+
     def set_object_robot_collision(self, object_id: int, enabled: bool) -> None:
         """Enable or disable collision between an object and every robot link."""
         for robot_link in range(-1, self.tool_link_index + 1):
@@ -374,13 +443,11 @@ class ManipulatorSimulation:
             p.stepSimulation(physicsClientId=self.client_id)
             if self.attached_object is not None:
                 object_id = self.object_ids[self.attached_object]
-                position = self.tool_position() - self._attachment_offset
-                if self._attachment_height is not None:
-                    position[2] = self._attachment_height
+                position, orientation = self._attached_object_pose()
                 p.resetBasePositionAndOrientation(
                     object_id,
                     position.tolist(),
-                    self._attachment_orientation,
+                    orientation,
                     physicsClientId=self.client_id,
                 )
                 p.resetBaseVelocity(
@@ -429,6 +496,12 @@ class ManipulatorSimulation:
     def close(self) -> None:
         """Disconnect this simulation from PyBullet."""
         if p.isConnected(self.client_id):
+            if self._egl_plugin is not None:
+                try:
+                    p.unloadPlugin(self._egl_plugin, physicsClientId=self.client_id)
+                except Exception:
+                    pass
+                self._egl_plugin = None
             p.disconnect(physicsClientId=self.client_id)
 
     def __enter__(self) -> "ManipulatorSimulation":

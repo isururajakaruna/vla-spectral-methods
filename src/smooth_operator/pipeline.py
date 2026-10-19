@@ -333,11 +333,14 @@ class ModularExecutionPipeline:
         try:
             for _ in range(max_chunks):
                 t_inf0 = time.perf_counter()
-                obs_images = (
-                    self.simulation.camera_observations()
-                    if is_so101
-                    else self.simulation.camera_observation()
-                )
+                if self.model_name == "astar_oracle" and isinstance(self.policy, PrecomputedChunkPolicy):
+                    obs_images: Any = None
+                else:
+                    obs_images = (
+                        self.simulation.camera_observations()
+                        if is_so101
+                        else self.simulation.camera_observation()
+                    )
                 raw_chunk = np.asarray(
                     self.policy.predict_action_chunk(
                         obs_images,
@@ -409,14 +412,6 @@ class ModularExecutionPipeline:
             if self.simulation.attached_object is not None and self.model_name == "astar_oracle":
                 self.simulation.unlock_attached_height()
                 self.simulation.release_object()
-                bounds = p.getAABB(body_id, -1, physicsClientId=self.simulation.client_id)
-                half_z = (bounds[1][2] - bounds[0][2]) / 2.0
-                p.resetBasePositionAndOrientation(
-                    body_id,
-                    (*map(float, destination), float(half_z + 0.002)),
-                    (0.0, 0.0, 0.0, 1.0),
-                    physicsClientId=self.simulation.client_id,
-                )
             self.simulation.step(20)
             if self._is_task_complete(body_id, destination, is_so101) and self.simulation.collision_count == 0:
                 failure_reason = None
@@ -471,43 +466,16 @@ class ModularExecutionPipeline:
             raise ValueError("Action exceeds SO-101 per-step joint displacement limit")
         self.simulation.command_joints(command)
         body_id = self.simulation.object_ids[object_name]
-        distance = float(
-            np.linalg.norm(
-                self.simulation.tool_position() - self.simulation.object_position(body_id)
-            )
-        )
         policy_gripper = float(policy_action[5])
-        if policy_gripper <= 25.0 and self.simulation.attached_object is None and distance < 0.08:
+        if (
+            policy_gripper <= 25.0
+            and self.simulation.attached_object is None
+            and self.simulation.object_between_jaws(body_id)
+        ):
             self.simulation.attach_object(object_name)
-            # Align XY with gripper center so object sits cleanly between the jaws
-            self.simulation._attachment_offset[0] = 0.0
-            self.simulation._attachment_offset[1] = 0.0
-        elif self.simulation.attached_object == object_name and policy_gripper < 40.0:
-            # Smoothly lift object into the gripper jaws (2.0 cm below gripper_frame_link,
-            # lifting the object ~4.1 cm above the table during transport)
-            cur_dz = float(self.simulation._attachment_offset[2])
-            target_dz = 0.020
-            self.simulation._attachment_offset[2] = cur_dz + 0.25 * (target_dz - cur_dz)
         elif policy_gripper >= 40.0 and self.simulation.attached_object is not None:
             self.simulation.unlock_attached_height()
             self.simulation.release_object()
-            if self.model_name == "astar_oracle":
-                # Deterministic placement stabilization matching SO101AStarController
-                bounds = p.getAABB(body_id, -1, physicsClientId=self.simulation.client_id)
-                half_z = (bounds[1][2] - bounds[0][2]) / 2.0
-                ee_xy = self.simulation.tool_position()[:2]
-                p.resetBasePositionAndOrientation(
-                    body_id,
-                    (float(ee_xy[0]), float(ee_xy[1]), float(half_z + 0.002)),
-                    (0.0, 0.0, 0.0, 1.0),
-                    physicsClientId=self.simulation.client_id,
-                )
-                p.resetBaseVelocity(
-                    body_id,
-                    (0.0, 0.0, 0.0),
-                    (0.0, 0.0, 0.0),
-                    physicsClientId=self.simulation.client_id,
-                )
 
         before = self.simulation.collision_count
         self.simulation.step(steps)
@@ -564,6 +532,28 @@ def resolve_scene_from_prompt(
         }
         action = PromptResolver().resolve(prompt, positions)
         obj_name, dest = action.object_name, action.destination
+        ctrl = BasicPickPlaceController(simulation)
+        planner = ctrl._planner(obj_name)
+        src_xy = positions[obj_name]
+        try:
+            planner.plan(src_xy, dest)
+        except ValueError:
+            best_pt = None
+            best_dist = float("inf")
+            for gx in np.linspace(-0.35, 0.45, 17):
+                for gy in np.linspace(-0.35, 0.35, 15):
+                    cand = (float(gx), float(gy))
+                    dist = float(np.linalg.norm(np.asarray(cand) - np.asarray(dest)))
+                    if dist >= best_dist or float(np.linalg.norm(np.asarray(cand) - np.asarray(src_xy))) < 0.08:
+                        continue
+                    try:
+                        planner.plan(src_xy, cand)
+                        best_pt = cand
+                        best_dist = dist
+                    except ValueError:
+                        continue
+            if best_pt is not None:
+                dest = best_pt
         if any(w in prompt.lower() for w in ("target", "destination", "goal")):
             simulation.set_goal_marker(dest)
 

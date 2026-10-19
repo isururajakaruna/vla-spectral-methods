@@ -67,7 +67,9 @@ class DatasetTests(unittest.TestCase):
         command = training_command(
             "user/data", Path("out"), 20, True, config_path=Path("checkpoint/config.json")
         )
-        self.assertIn("--policy.device=mps", command)
+        self.assertTrue(
+            "--policy.device=cuda" in command or "--policy.device=mps" in command
+        )
         self.assertIn("--batch_size=1", command)
         self.assertIn("--policy.chunk_size=10", command)
         self.assertIn("--policy.push_to_hub=false", command)

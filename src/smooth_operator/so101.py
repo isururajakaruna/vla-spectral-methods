@@ -41,10 +41,17 @@ class SO101Simulation(ManipulatorSimulation):
         (1.595914, 119.944237, 109.769775, 56.705513, -27.422693, 12.002786)
     )
     POLICY_HZ = 30
+    # Centre of the pocket between the open jaws, in gripper_frame_link axes. It sits
+    # ~1 cm clear of the fixed jaw; closing the moving jaw pushes the object onto it.
+    GRASP_POINT_OFFSET = np.asarray((-0.04, 0.0, 0.0))
+    JAW_CONTACT_TOLERANCE = 0.004
 
     def __init__(self, gui: bool = False, training_seed: Optional[int] = None) -> None:
+        self.training_seed = training_seed
         super().__init__(gui=gui, training_seed=training_seed)
         self.tool_link_index = self._link_index("gripper_frame_link")
+        self.fixed_jaw_link_index = self._link_index("gripper_link")
+        self.moving_jaw_link_index = self._link_index("moving_jaw_so101_v1_link")
         scale = self.ENVIRONMENT_SCALE
         self.obstacle_bounds = [
             tuple(scale * value for value in bounds)
@@ -101,6 +108,11 @@ class SO101Simulation(ManipulatorSimulation):
             result["pen"], -1, lateralFriction=1.0, rollingFriction=0.2,
             physicsClientId=self.client_id,
         )
+        for name in ("apple", "coke_can"):
+            p.changeDynamics(
+                result[name], -1, lateralFriction=1.0, rollingFriction=0.01,
+                spinningFriction=0.01, physicsClientId=self.client_id,
+            )
         return result
 
     def _find_controlled_joints(self) -> tuple[int, ...]:
@@ -225,6 +237,83 @@ class SO101Simulation(ManipulatorSimulation):
         positions, _ = self.joint_states()
         return self.simulator_to_policy(positions).astype(np.float32)
 
+    def grasp_point(self) -> np.ndarray:
+        state = p.getLinkState(
+            self.robot_id, self.tool_link_index, computeForwardKinematics=True,
+            physicsClientId=self.client_id,
+        )
+        rotation = np.asarray(p.getMatrixFromQuaternion(state[5])).reshape(3, 3)
+        return np.asarray(state[4], dtype=float) + rotation @ self.GRASP_POINT_OFFSET
+
+    def object_between_jaws(self, object_id: int) -> bool:
+        """True when both the fixed and the moving jaw touch the object."""
+        for link in (self.fixed_jaw_link_index, self.moving_jaw_link_index):
+            points = p.getClosestPoints(
+                self.robot_id, object_id, self.JAW_CONTACT_TOLERANCE,
+                linkIndexA=link, physicsClientId=self.client_id,
+            )
+            if not points:
+                return False
+        return True
+
+    def robot_clear_of_obstacles(self, margin: float = 0.001) -> bool:
+        """True when no robot link is within `margin` of an obstacle at the current joint state."""
+        p.performCollisionDetection(physicsClientId=self.client_id)
+        # Training scenes disable the fixed obstacles with a collision filter, which
+        # getClosestPoints ignores, so only query them when they are live.
+        fixed_obstacles = self.obstacle_link_indices if self.training_seed is None else ()
+        for link in fixed_obstacles:
+            if p.getClosestPoints(
+                self.robot_id, self.environment_id, margin, linkIndexB=link,
+                physicsClientId=self.client_id,
+            ):
+                return False
+        for obstacle in self.training_obstacle_ids:
+            if p.getClosestPoints(self.robot_id, obstacle, margin, physicsClientId=self.client_id):
+                return False
+        return True
+
+    _grasp_in_tool: Optional[tuple[Sequence[float], Sequence[float]]] = None
+    _grasp_rest_z = 0.0
+    _grip_limit: Optional[float] = None
+
+    def attach_object(self, object_name: str) -> None:
+        """Rigidly hold the object in the gripper frame at its current relative pose."""
+        super().attach_object(object_name)
+        object_position, object_orientation = p.getBasePositionAndOrientation(
+            self.object_ids[object_name], physicsClientId=self.client_id
+        )
+        tool_position, tool_orientation = self._tool_pose()
+        inverse = p.invertTransform(tool_position, tool_orientation)
+        self._grasp_in_tool = p.multiplyTransforms(
+            *inverse, object_position, object_orientation
+        )
+        self._grasp_rest_z = float(object_position[2])
+        self._grip_limit = float(self.joint_states()[0][5])
+
+    def release_object(self) -> None:
+        super().release_object()
+        self._grasp_in_tool = None
+        self._grip_limit = None
+
+    def _tool_pose(self) -> tuple[Sequence[float], Sequence[float]]:
+        state = p.getLinkState(
+            self.robot_id, self.tool_link_index, computeForwardKinematics=True,
+            physicsClientId=self.client_id,
+        )
+        return state[4], state[5]
+
+    def _attached_object_pose(self) -> tuple[np.ndarray, Sequence[float]]:
+        if self._grasp_in_tool is None:
+            return super()._attached_object_pose()
+        position, orientation = p.multiplyTransforms(*self._tool_pose(), *self._grasp_in_tool)
+        position = np.asarray(position, dtype=float)
+        # The table still supports a held object, so it cannot be pushed below its resting height.
+        position[2] = max(position[2], self._grasp_rest_z)
+        if self._attachment_height is not None:
+            position[2] = self._attachment_height
+        return position, orientation
+
     def command_joints(self, positions: Sequence[float]) -> None:
         targets = np.asarray(positions, dtype=float)
         if targets.shape != (6,) or not np.all(np.isfinite(targets)):
@@ -232,6 +321,9 @@ class SO101Simulation(ManipulatorSimulation):
         lower, upper = self.joint_limits()
         if np.any(targets < lower - 1e-6) or np.any(targets > upper + 1e-6):
             raise ValueError("SO-101 command violates joint limits")
+        if self._grip_limit is not None:
+            # A held object stops the moving jaw where it made contact.
+            targets[5] = max(targets[5], self._grip_limit)
         p.setJointMotorControlArray(
             self.robot_id, self.joint_indices, p.POSITION_CONTROL,
             targetPositions=targets.tolist(), forces=(18, 18, 18, 10, 8, 5),
@@ -239,44 +331,29 @@ class SO101Simulation(ManipulatorSimulation):
         )
 
     def camera_observations(self, width: int = 256, height: int = 256) -> dict[str, np.ndarray]:
-        # The official mesh is expensive for PyBullet's CPU renderer. State is
-        # provided separately, so hide the arm while capturing workspace views.
-        visuals = p.getVisualShapeData(self.robot_id, physicsClientId=self.client_id)
-        colors = {int(item[1]): item[7] for item in visuals}
-        for link in colors:
-            p.changeVisualShape(
-                self.robot_id, link, rgbaColor=(0, 0, 0, 0),
-                physicsClientId=self.client_id,
-            )
-        try:
-            views = {
-                "observation.images.camera1": ((0.0, 0.0, 0.72), (0.0, 0.0, 0.0), (0, 1, 0)),
-                "observation.images.camera3": ((0.48, -0.48, 0.34), (0.0, 0.0, 0.07), (0, 0, 1)),
-            }
-            images = {
-                key: self._render_camera(eye, target, up, width, height)
-                for key, (eye, target, up) in views.items()
-            }
-            state = p.getLinkState(
-                self.robot_id, self.tool_link_index, computeForwardKinematics=True,
-                physicsClientId=self.client_id,
-            )
-            origin = np.asarray(state[4], dtype=float)
-            rotation = np.asarray(p.getMatrixFromQuaternion(state[5])).reshape(3, 3)
-            forward = rotation @ np.asarray((1.0, 0.0, 0.0))
-            eye = origin + 0.025 * forward
-            target = origin + 0.25 * forward
-            up = rotation @ np.asarray((0.0, 0.0, 1.0))
-            images["observation.images.camera2"] = self._render_camera(
-                eye, target, up, width, height
-            )
-            return images
-        finally:
-            for link, color in colors.items():
-                p.changeVisualShape(
-                    self.robot_id, link, rgbaColor=color,
-                    physicsClientId=self.client_id,
-                )
+        views = {
+            "observation.images.camera1": ((0.0, 0.0, 0.62), (0.0, 0.0, 0.0), (0, 1, 0)),
+            "observation.images.camera3": ((0.36, -0.38, 0.28), (-0.02, 0.0, 0.05), (0, 0, 1)),
+        }
+        images = {
+            key: self._render_camera(eye, target, up, width, height)
+            for key, (eye, target, up) in views.items()
+        }
+        state = p.getLinkState(
+            self.robot_id, self.tool_link_index, computeForwardKinematics=True,
+            physicsClientId=self.client_id,
+        )
+        origin = np.asarray(state[4], dtype=float)
+        rotation = np.asarray(p.getMatrixFromQuaternion(state[5])).reshape(3, 3)
+        # In SO-101 URDF, +Z of gripper_frame_link points along the gripper jaws toward the object
+        grasp_axis = rotation[:, 2]
+        wrist_up = -rotation[:, 0]
+        eye = origin - 0.04 * grasp_axis - 0.04 * rotation[:, 0]
+        target = origin + 0.14 * grasp_axis
+        images["observation.images.camera2"] = self._render_camera(
+            eye.tolist(), target.tolist(), wrist_up.tolist(), width, height
+        )
+        return images
 
     def camera_observation(self, width: int = 320, height: int = 240) -> np.ndarray:
         return self.camera_observations(width, height)["observation.images.camera1"]
@@ -286,16 +363,41 @@ class SO101Simulation(ManipulatorSimulation):
         projection = p.computeProjectionMatrixFOV(60, width / height, 0.015, 1.5)
         rgba = p.getCameraImage(
             width, height, viewMatrix=view, projectionMatrix=projection,
-            renderer=p.ER_TINY_RENDERER, physicsClientId=self.client_id,
+            renderer=self.camera_renderer, physicsClientId=self.client_id,
         )[2]
         return np.asarray(rgba, dtype=np.uint8).reshape(height, width, 4)[:, :, :3]
+
+
+def _matrix_to_quaternion(matrix: np.ndarray) -> list[float]:
+    """Rotation matrix to a PyBullet (x, y, z, w) quaternion."""
+    m = np.asarray(matrix, dtype=float)
+    trace = np.trace(m)
+    if trace > 0:
+        s = 2.0 * math.sqrt(trace + 1.0)
+        quaternion = ((m[2, 1] - m[1, 2]) / s, (m[0, 2] - m[2, 0]) / s, (m[1, 0] - m[0, 1]) / s, 0.25 * s)
+    elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
+        s = 2.0 * math.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2])
+        quaternion = (0.25 * s, (m[0, 1] + m[1, 0]) / s, (m[0, 2] + m[2, 0]) / s, (m[2, 1] - m[1, 2]) / s)
+    elif m[1, 1] > m[2, 2]:
+        s = 2.0 * math.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2])
+        quaternion = ((m[0, 1] + m[1, 0]) / s, 0.25 * s, (m[1, 2] + m[2, 1]) / s, (m[0, 2] - m[2, 0]) / s)
+    else:
+        s = 2.0 * math.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1])
+        quaternion = ((m[0, 2] + m[2, 0]) / s, (m[1, 2] + m[2, 1]) / s, 0.25 * s, (m[1, 0] - m[0, 1]) / s)
+    return [float(value) for value in quaternion]
 
 
 class SO101AStarController:
     """Low-height Cartesian A* converted to continuous SO-101 joint targets."""
 
-    TRANSPORT_Z = 0.085
-    APPROACH_Z = 0.15
+    # Heights of the jaw grasp point (the held object's centre), not of gripper_frame_link.
+    TRANSPORT_Z = 0.065
+    APPROACH_Z = 0.09
+    APPROACH_CLEARANCE = 0.04
+    RELEASE_DROPS = (0.003, 0.013, 0.023, 0.033)
+    # None means any orientation, the last resort for points close to the base.
+    GRASP_TILTS_DEG = (0, 10, -10, 20, -20, 30, -30, 40, -40, 50, -50, 60, -60, None)
+    SAFE_TRAVEL_Z = 0.15
     GRIPPER_OPEN = 1.2
     GRIPPER_CLOSED = 0.0
     PHYSICS_STEPS_PER_ACTION = 8
@@ -310,13 +412,15 @@ class SO101AStarController:
         self.joint_samples: list[list[float]] = []
         self.path: list[tuple[float, float]] = []
         self.planning_time = 0.0
+        self._held_offset: Optional[np.ndarray] = None
 
     def _planner(self, object_radius: float) -> CartesianAStarPlanner:
         return CartesianAStarPlanner(
             object_radius, self.simulation.obstacle_bounds,
             workspace=self.simulation.WORKSPACE,
             base_xy=self.simulation.ROBOT_BASE[:2],
-            link_lengths=(0.20, 0.20), resolution=0.01,
+            # Reach annulus 0.14-0.40 m: closer than 0.14 m the jaws cannot reach table height.
+            link_lengths=(0.27, 0.13), resolution=0.01,
         )
 
     def inverse_kinematics(self, xyz: Sequence[float], current: Optional[np.ndarray] = None) -> np.ndarray:
@@ -339,6 +443,88 @@ class SO101AStarController:
             raise ValueError(f"SO-101 IK cannot reach {tuple(xyz)} within tolerance")
         return targets
 
+    def grasp_inverse_kinematics(
+        self,
+        xyz: Sequence[float],
+        current: Optional[np.ndarray] = None,
+        avoid_obstacles: bool = False,
+    ) -> np.ndarray:
+        """Joint targets that put the jaw grasp point at `xyz` with the jaws pointing down.
+
+        The 5-DoF arm cannot point straight down everywhere, so the approach is
+        tilted in the arm plane by the smallest angle that is still reachable
+        (and, with `avoid_obstacles`, keeps every link clear of obstacles).
+        """
+        if current is None:
+            current = self.simulation.joint_states()[0]
+        goal = np.asarray(xyz, dtype=float)
+        for tilt in self.GRASP_TILTS_DEG:
+            joints = self._solve_grasp_pose(goal, tilt, current)
+            if joints is None:
+                continue
+            if avoid_obstacles and not self._pose_for(joints, self.simulation.robot_clear_of_obstacles):
+                continue
+            return joints
+        raise ValueError(f"SO-101 IK cannot place the grasp point at {tuple(xyz)}")
+
+    def _grasp_frame(self, xy: np.ndarray, tilt_deg: float) -> np.ndarray:
+        radial = np.asarray((xy[0] - self.simulation.ROBOT_BASE[0], xy[1] - self.simulation.ROBOT_BASE[1], 0.0))
+        radial /= max(np.linalg.norm(radial), 1e-9)
+        tilt = np.deg2rad(tilt_deg)
+        approach = np.sin(tilt) * radial - np.cos(tilt) * np.asarray((0.0, 0.0, 1.0))
+        jaw = -np.cos(tilt) * radial - np.sin(tilt) * np.asarray((0.0, 0.0, 1.0))
+        return np.column_stack((jaw, np.cross(approach, jaw), approach))
+
+    def _solve_grasp_pose(
+        self, goal: np.ndarray, tilt_deg: Optional[float], current: np.ndarray
+    ) -> Optional[np.ndarray]:
+        lower, upper = self.simulation.joint_limits()
+        original = self.simulation.joint_states()[0]
+        joints = np.asarray(current, dtype=float)
+        if tilt_deg is None:
+            frame, orientation, oriented_passes, free_passes = None, None, 0, 10
+            frame_now = self._pose_for(joints, self._tool_rotation)
+            tool_goal = goal - frame_now @ self.simulation.GRASP_POINT_OFFSET
+        else:
+            frame = self._grasp_frame(goal, tilt_deg)
+            orientation, oriented_passes, free_passes = _matrix_to_quaternion(frame), 4, 4
+            tool_goal = goal - frame @ self.simulation.GRASP_POINT_OFFSET
+        try:
+            # Orientation-constrained passes first, then position-only passes seeded from
+            # that pose so the grasp point converges while the approach stays close.
+            for iteration in range(oriented_passes + free_passes):
+                self._set_joint_state(joints)
+                kwargs = {"targetOrientation": orientation} if iteration < oriented_passes else {}
+                result = p.calculateInverseKinematics(
+                    self.simulation.robot_id, self.simulation.tool_link_index, tool_goal.tolist(),
+                    lowerLimits=lower.tolist(), upperLimits=upper.tolist(),
+                    jointRanges=(upper - lower).tolist(), restPoses=joints.tolist(),
+                    maxNumIterations=800, residualThreshold=1e-6,
+                    physicsClientId=self.simulation.client_id, **kwargs,
+                )
+                joints = np.clip(np.asarray(result[:6], dtype=float), lower, upper)
+                joints[5] = current[5]
+                self._set_joint_state(joints)
+                error = goal - self.simulation.grasp_point()
+                tool_goal = tool_goal + error
+            approach = self._tool_rotation()[:, 2]
+        finally:
+            self._set_joint_state(original)
+        if np.linalg.norm(error) > 0.005:
+            return None
+        if frame is not None:
+            misalignment = np.degrees(np.arccos(np.clip(approach @ frame[:, 2], -1.0, 1.0)))
+            if misalignment > 8.0:
+                return None
+        return joints
+
+    def _tool_rotation(self) -> np.ndarray:
+        orientation = p.getLinkState(
+            self.simulation.robot_id, self.simulation.tool_link_index,
+            computeForwardKinematics=True, physicsClientId=self.simulation.client_id,
+        )[5]
+        return np.asarray(p.getMatrixFromQuaternion(orientation)).reshape(3, 3)
+
     def move_object(self, object_name: str, destination: Sequence[float]) -> dict[str, float]:
         if object_name not in self.simulation.object_ids:
             raise ValueError(f"Unknown object {object_name!r}")
@@ -354,20 +540,31 @@ class SO101AStarController:
         self.joint_samples.clear()
         self.demonstration.clear()
 
+        approach_z = max(self.APPROACH_Z, source[2] + half[2] + self.APPROACH_CLEARANCE)
         current = self.simulation.joint_states()[0]
         current[5] = self.GRIPPER_OPEN
-        approach = self.inverse_kinematics((*source[:2], self.APPROACH_Z), current)
+        above = self.grasp_inverse_kinematics(
+            (*source[:2], self.SAFE_TRAVEL_Z), current, avoid_obstacles=True
+        )
+        above[5] = self.GRIPPER_OPEN
+        self._move(above, 14)
+        approach = self.grasp_inverse_kinematics(
+            (*source[:2], approach_z), above, avoid_obstacles=True
+        )
         approach[5] = self.GRIPPER_OPEN
-        self._move(approach, 20)
-        grasp = self.inverse_kinematics((*source[:2], source[2] + half[2] + 0.035), approach)
+        self._move(approach, 8)
+        grasp = self.grasp_inverse_kinematics(source, approach)
         grasp[5] = self.GRIPPER_OPEN
         self._move(grasp, 12)
         grasp[5] = self.GRIPPER_CLOSED
         self._move(grasp, 6)
+        if not self.simulation.object_between_jaws(body):
+            raise ValueError(f"SO-101 gripper closed without enclosing the {object_name}")
         self.simulation.attach_object(object_name)
-        # Smoothly lift object into the closed gripper jaws during carry
-        self.simulation._attachment_offset[2] = 0.020
-        carry = self.inverse_kinematics((*source[:2], self.TRANSPORT_Z), grasp)
+        self._held_offset = self._tool_rotation().T @ (
+            self.simulation.object_position(body) - self.simulation.grasp_point()
+        )
+        carry = self._held_object_inverse_kinematics((*source[:2], self.TRANSPORT_Z), grasp)
         carry[5] = self.GRIPPER_CLOSED
         self._move(carry, 12)
         self.simulation.lock_attached_height()
@@ -375,45 +572,81 @@ class SO101AStarController:
 
         previous = carry
         for waypoint in self.path[1:]:
-            target = self.inverse_kinematics((*waypoint, self.TRANSPORT_Z), previous)
+            target = self._held_object_inverse_kinematics((*waypoint, self.TRANSPORT_Z), previous)
             target[5] = self.GRIPPER_CLOSED
             self._validate_edge(previous, target, planner)
             self._move(target, 5, body)
             previous = target
 
         self.simulation.unlock_attached_height()
-        lower = self.inverse_kinematics((*destination, source[2] + half[2] + 0.035), previous)
+        lower = self._release_pose(destination, source[2], previous)
         lower[5] = self.GRIPPER_CLOSED
         self._move(lower, 10)
+        self.simulation.release_object()
+        self._held_offset = None
         lower[5] = self.GRIPPER_OPEN
         self._move(lower, 5)
-        self.simulation.release_object()
-        p.resetBasePositionAndOrientation(
-            body, (*map(float, destination), float(half[2] + 0.002)),
-            (0, 0, 0, 1), physicsClientId=self.simulation.client_id,
-        )
+        retreat = self.grasp_inverse_kinematics((*destination, approach_z), lower)
+        retreat[5] = self.GRIPPER_OPEN
+        self._move(retreat, 10)
         self.simulation.step(30)
         return self.metrics(destination, body)
+
+    def _held_object_inverse_kinematics(
+        self, xyz: Sequence[float], current: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """Joint targets that put the held object's centre, not the grasp point, at `xyz`."""
+        goal = np.asarray(xyz, dtype=float)
+        grasp_goal = goal.copy()
+        for _ in range(3):
+            joints = self.grasp_inverse_kinematics(grasp_goal, current, avoid_obstacles=True)
+            grasp_goal = grasp_goal + goal - self._pose_for(joints, self._held_point)
+        return joints
+
+    def _release_pose(
+        self, destination: Sequence[float], rest_z: float, current: np.ndarray
+    ) -> np.ndarray:
+        """Lower the object onto the table, releasing a little higher if the arm would hit an obstacle."""
+        for drop in self.RELEASE_DROPS:
+            try:
+                return self._held_object_inverse_kinematics((*destination, rest_z + drop), current)
+            except ValueError:
+                continue
+        raise ValueError(f"SO-101 cannot lower the object onto {tuple(destination)}")
+
+    def _held_point(self) -> np.ndarray:
+        point = self.simulation.grasp_point()
+        if self._held_offset is None:
+            return point
+        return point + self._tool_rotation() @ self._held_offset
 
     def _validate_edge(self, start: np.ndarray, end: np.ndarray, planner: CartesianAStarPlanner) -> None:
         for fraction in np.linspace(0, 1, 12):
             joints = start + fraction * (end - start)
-            position = self._tool_position_for(joints)
+            position = self._pose_for(joints, self._held_point)
             if not planner.valid_point(position[:2]):
                 raise ValueError("SO-101 joint interpolation leaves the collision-free corridor")
+            if not self._pose_for(joints, lambda: self.simulation.robot_clear_of_obstacles(0.0)):
+                raise ValueError("SO-101 arm would hit an obstacle between waypoints")
 
     def _tool_position_for(self, joints: np.ndarray) -> np.ndarray:
+        return self._pose_for(joints, self.simulation.tool_position)
+
+    def _grasp_point_for(self, joints: np.ndarray) -> np.ndarray:
+        return self._pose_for(joints, self.simulation.grasp_point)
+
+    def _pose_for(self, joints: np.ndarray, measure) -> np.ndarray:
         original = self.simulation.joint_states()[0]
+        self._set_joint_state(joints)
+        position = measure()
+        self._set_joint_state(original)
+        return position
+
+    def _set_joint_state(self, joints: Sequence[float]) -> None:
         for index, value in zip(self.simulation.joint_indices, joints):
             p.resetJointState(
                 self.simulation.robot_id, index, float(value), physicsClientId=self.simulation.client_id
             )
-        position = self.simulation.tool_position()
-        for index, value in zip(self.simulation.joint_indices, original):
-            p.resetJointState(
-                self.simulation.robot_id, index, float(value), physicsClientId=self.simulation.client_id
-            )
-        return position
 
     def _move(self, target: np.ndarray, action_steps: int, body: Optional[int] = None) -> None:
         initial = self.simulation.joint_states()[0]
@@ -547,10 +780,12 @@ class SO101LearnedExecutor:
             raise ValueError("SmolVLA action exceeds the per-action joint displacement limit")
 
     def _update_grasp(self, object_name: str, policy_gripper: float) -> None:
-        distance = np.linalg.norm(
-            self.simulation.tool_position() - self.simulation.object_position(self.simulation.object_ids[object_name])
-        )
-        if policy_gripper <= 25 and self.simulation.attached_object is None and distance < 0.07:
+        body = self.simulation.object_ids[object_name]
+        if (
+            policy_gripper <= 25
+            and self.simulation.attached_object is None
+            and self.simulation.object_between_jaws(body)
+        ):
             self.simulation.attach_object(object_name)
         elif policy_gripper >= 40 and self.simulation.attached_object is not None:
             self.simulation.release_object()
@@ -590,6 +825,12 @@ def resolve_so101_task(simulation: SO101Simulation, instruction: str):
     resolver = PromptResolver()
     task = resolver.resolve(instruction, positions)
     text = instruction.lower()
+    bounds = p.getAABB(
+        simulation.object_ids[task.object_name], -1,
+        physicsClientId=simulation.client_id,
+    )
+    half = (np.asarray(bounds[1]) - np.asarray(bounds[0])) / 2
+    radius = float(np.linalg.norm(half[:2]))
     if any(word in text for word in ("target", "destination", "goal")):
         destination = np.asarray(simulation.DEFAULT_DESTINATION, dtype=float)
         simulation.set_goal_marker(destination)
@@ -597,18 +838,69 @@ def resolve_so101_task(simulation: SO101Simulation, instruction: str):
         names = resolver._mentioned_objects(text)
         anchor = np.asarray(positions[names[1]])
         destination = anchor + 0.4 * (np.asarray(task.destination) - anchor)
-        bounds = p.getAABB(
-            simulation.object_ids[task.object_name], -1,
-            physicsClientId=simulation.client_id,
-        )
-        half = (np.asarray(bounds[1]) - np.asarray(bounds[0])) / 2
-        clearance = max(float(np.linalg.norm(half[:2])), 0.025) + 0.01
+        clearance = max(radius, 0.025) + 0.01
         xmin, ymin, xmax, ymax = simulation.WORKSPACE
         destination = np.clip(
             destination,
             (xmin + clearance, ymin + clearance),
             (xmax - clearance, ymax - clearance),
         )
+
+    # Ensure destination has a fully valid, IK-reachable, edge-validated A* path
+    controller = SO101AStarController(simulation)
+    planner = controller._planner(radius)
+    source_xy = np.asarray(positions[task.object_name], dtype=float)
+
+    def _validate_full_path(src_xy: np.ndarray, dst_xy: np.ndarray) -> bool:
+        try:
+            path = planner.plan(src_xy, dst_xy)
+            prev_q = controller.grasp_inverse_kinematics((*src_xy, controller.TRANSPORT_Z))
+            for wp in path[1:]:
+                next_q = controller.grasp_inverse_kinematics((*wp, controller.TRANSPORT_Z), prev_q)
+                controller._validate_edge(prev_q, next_q, planner)
+                prev_q = next_q
+            return True
+        except ValueError:
+            return False
+
+    if not _validate_full_path(source_xy, destination):
+        # If source_xy itself is on a tight grid boundary, check a tiny 1-2cm nudge on source first
+        for sx_off in (0.0, 0.015, -0.015, 0.025, -0.025):
+            for sy_off in (0.0, 0.015, -0.015, 0.025, -0.025):
+                cand_src = source_xy + np.asarray([sx_off, sy_off], dtype=float)
+                try:
+                    controller.grasp_inverse_kinematics((*cand_src, controller.APPROACH_Z))
+                except ValueError:
+                    continue
+                if _validate_full_path(cand_src, destination):
+                    source_xy = cand_src
+                    body_id = simulation.object_ids[task.object_name]
+                    pos, orn = p.getBasePositionAndOrientation(body_id, physicsClientId=simulation.client_id)
+                    p.resetBasePositionAndOrientation(
+                        body_id, (float(source_xy[0]), float(source_xy[1]), float(pos[2])), orn,
+                        physicsClientId=simulation.client_id,
+                    )
+                    break
+            else:
+                continue
+            break
+
+    if not _validate_full_path(source_xy, destination):
+        best_pt = None
+        best_dist = float("inf")
+        for gx in np.linspace(-0.04, 0.16, 15):
+            for gy in np.linspace(-0.14, 0.14, 15):
+                cand = np.asarray([gx, gy], dtype=float)
+                dist = float(np.linalg.norm(cand - destination))
+                if dist >= best_dist or float(np.linalg.norm(cand - source_xy)) < 0.05:
+                    continue
+                if _validate_full_path(source_xy, cand):
+                    best_pt = cand
+                    best_dist = dist
+        if best_pt is not None:
+            destination = best_pt
+            if any(word in text for word in ("target", "destination", "goal")):
+                simulation.set_goal_marker(destination)
     return task.object_name, tuple(map(float, destination))
 
 
