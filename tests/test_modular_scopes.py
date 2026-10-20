@@ -196,17 +196,51 @@ class EndToEndScopesTests(unittest.TestCase):
     def test_webapp_catalog_preview_and_headless_launch(self):
         from smooth_operator.webapp import (
             ARRANGEMENT_CATALOG,
-            MODEL_CATALOG,
+            DECODER_CATALOG,
             build_arrangement_preview,
             execute_web_launch,
+            model_catalog,
         )
 
-        # Ensure both Time-Domain and Frequency-Domain models exist
-        td_models = MODEL_CATALOG["time_domain"]
-        fd_models = MODEL_CATALOG["frequency_domain"]
-        self.assertGreaterEqual(len(td_models), 2)
-        self.assertGreaterEqual(len(fd_models), 4)
-        self.assertGreaterEqual(len(ARRANGEMENT_CATALOG), 3)
+        models = {m["id"]: m for m in model_catalog()}
+        self.assertEqual(models["smolvla"]["kind"], "vla")
+        self.assertEqual(models["smolvla"]["variants"]["so101"]["checkpoint"], "lerobot/smolvla_base")
+        self.assertEqual(models["smolvla"]["variants"]["libero"]["checkpoint"], "lerobot/smolvla_libero")
+        self.assertEqual(models["astar_expert"]["kind"], "scripted")
+        for model in models.values():
+            for decoder in model["decoders"]:
+                self.assertIn(decoder, DECODER_CATALOG)
+            # Every model opens on an environment it has a runnable checkpoint for.
+            if model["available"]:
+                robot = ARRANGEMENT_CATALOG[model["default_arrangement"]]["robot"]
+                self.assertTrue(model["variants"][robot]["available"])
+        def domains(model_id):
+            return {DECODER_CATALOG[d]["domain"] for d in models[model_id]["decoders"]}
+
+        # Each VLA appears only in the tab matching its native action output.
+        for model in models.values():
+            if model["kind"] == "vla":
+                self.assertEqual(domains(model["id"]), {model["domain"]})
+        self.assertEqual(domains("smolvla"), {"time_domain"})
+        self.assertEqual(domains("pi0fast"), {"frequency_domain"})
+        self.assertEqual(set(models["pi0fast"]["decoders"]), {"fast_idct", "band_idct", "custom_hybrid"})
+        self.assertEqual(models["pi0fast"]["default_arrangement"], "libero_object")
+        self.assertEqual(models["astar_expert"]["robots"], ["so101", "scara"])
+        self.assertEqual(domains("astar_expert"), {"time_domain", "frequency_domain"})
+        self.assertFalse(models["groot"]["available"])
+        self.assertEqual(ARRANGEMENT_CATALOG["libero_object"]["robot"], "libero")
+        self.assertEqual(len(ARRANGEMENT_CATALOG["libero_10"]["prompts"]), 10)
+
+        with self.assertRaises(ValueError):
+            execute_web_launch({"arrangement_id": "scara_seed_9", "model_id": "smolvla"})
+        with self.assertRaises(ValueError):
+            execute_web_launch({"arrangement_id": "libero_object", "model_id": "astar_expert"})
+        with self.assertRaises(ValueError):
+            execute_web_launch({"arrangement_id": "so101_seed_9", "model_id": "groot"})
+        with self.assertRaises(ValueError):
+            execute_web_launch({"arrangement_id": "so101_seed_9", "model_id": "pi0fast", "decoder": "fast_idct"})
+        with self.assertRaises(ValueError):
+            execute_web_launch({"arrangement_id": "libero_object", "model_id": "pi0fast", "decoder": "ifft"})
 
         # Verify arrangement preview renders schematic + live camera views + objects
         preview = build_arrangement_preview("so101_seed_9")
@@ -220,9 +254,8 @@ class EndToEndScopesTests(unittest.TestCase):
         launch_out = execute_web_launch(
             {
                 "arrangement_id": "so101_seed_9",
-                "model": "astar_oracle",
-                "fast_tokenization": True,
-                "spectrum_schema": "custom_hybrid",
+                "model_id": "astar_expert",
+                "decoder": "custom_hybrid",
                 "freq_band": "0.0,0.40",
                 "quant_scale": 50.0,
                 "prompt": "Move the apple to the target",

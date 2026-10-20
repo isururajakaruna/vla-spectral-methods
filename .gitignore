@@ -226,3 +226,5 @@ datasets/
 checkpoints/
 .hf-cache/
 data/runs/
+data/previews/
+data/inference_server.log

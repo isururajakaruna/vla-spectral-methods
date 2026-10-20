@@ -552,6 +552,41 @@ class CustomHybridSpectrumModule:
         return out
 
 
+def decode_model_spectrum(
+    module: InverseSpectrumModule,
+    spectrum: dict[str, Any],
+    prev_chunk_tail: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """Decode DCT coefficients predicted natively by a model (e.g. π0-FAST tokens).
+
+    `spectrum` holds `dct_coeffs` (H, D) on the orthonormal DCT-II basis and a per-joint
+    `offset` (D,), such that `idct_iii(dct_coeffs) + offset` is the model's own action chunk.
+    """
+    coeffs = np.asarray(spectrum["dct_coeffs"], dtype=float)
+    offset = np.asarray(spectrum["offset"], dtype=float).reshape(1, -1)
+    if coeffs.ndim != 2 or offset.shape[1] != coeffs.shape[1] or not np.all(np.isfinite(coeffs)):
+        raise ValueError("Malformed model spectrum")
+    if isinstance(module, FASTIDCTModule):
+        return module.decode({"dct_coeffs": coeffs, "offset": offset, "quant_scale": 0.0})
+    if isinstance(module, CustomHybridSpectrumModule):
+        h, d = coeffs.shape
+        grip_idx = module.gripper_channel if module.gripper_channel >= 0 else d + module.gripper_channel
+        arm_indices = [i for i in range(d) if i != grip_idx]
+        payload = {
+            "shape": [h, d],
+            "grip_idx": grip_idx,
+            "arm_indices": arm_indices,
+            "arm_dct_tokens": coeffs[:, arm_indices],
+            "quant_scale": 0.0,
+            "arm_offset": offset[:, arm_indices],
+            "gripper_trace": idct_iii(coeffs[:, [grip_idx]]) + offset[:, [grip_idx]],
+        }
+        return module.decode(payload, prev_chunk_tail=prev_chunk_tail)
+    raise ValueError(
+        f"Decoder {module.schema_name!r} cannot invert DCT coefficients; use a DCT-family decoder"
+    )
+
+
 def create_spectrum_module(
     schema: str = "direct",
     freq_band: Sequence[float] = (0.0, 1.0),

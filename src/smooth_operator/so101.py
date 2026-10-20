@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 
 from .planning import CartesianAStarPlanner
 from .simulation import ASSET_DIR, ManipulatorSimulation
+from .vla_models import LEGACY_OFFSET_DEGREES, LEGACY_SIGN
 
 
 SO101_ASSET_DIR = ASSET_DIR / "so101"
@@ -35,11 +36,12 @@ class SO101Simulation(ManipulatorSimulation):
         "wrist_roll",
         "gripper",
     )
-    # The base checkpoint contains several physical-arm calibrations.  This
-    # canonical centre maps the URDF zero pose into the dominant `so100` frame.
-    POLICY_ZERO_DEGREES = np.asarray(
-        (1.595914, 119.944237, 109.769775, 56.705513, -27.422693, 12.002786)
-    )
+    # Legacy LeRobot `so100` degrees, the frame of the SO-100 community data most
+    # VLAs were pretrained on: policy = sign * URDF degrees + offset. The URDF
+    # matches the LeRobot >= 0.5 calibration; this is LeRobot's documented
+    # backward-compatibility transform (huggingface.co/docs/lerobot/backwardcomp).
+    POLICY_SIGN = np.asarray(LEGACY_SIGN)
+    POLICY_OFFSET_DEGREES = np.asarray(LEGACY_OFFSET_DEGREES)
     POLICY_HZ = 30
     # Centre of the pocket between the open jaws, in gripper_frame_link axes. It sits
     # ~1 cm clear of the fixed jaw; closing the moving jaw pushes the object onto it.
@@ -225,13 +227,13 @@ class SO101Simulation(ManipulatorSimulation):
         values = np.asarray(joints, dtype=float)
         if values.shape != (6,):
             raise ValueError("Expected six SO-101 simulator joints")
-        return self.POLICY_ZERO_DEGREES + np.rad2deg(values)
+        return self.POLICY_SIGN * np.rad2deg(values) + self.POLICY_OFFSET_DEGREES
 
     def policy_to_simulator(self, values: Sequence[float]) -> np.ndarray:
         policy = np.asarray(values, dtype=float)
         if policy.shape != (6,) or not np.all(np.isfinite(policy)):
             raise ValueError("Expected six finite SO-101 policy actions")
-        return np.deg2rad(policy - self.POLICY_ZERO_DEGREES)
+        return np.deg2rad(self.POLICY_SIGN * (policy - self.POLICY_OFFSET_DEGREES))
 
     def policy_state(self) -> np.ndarray:
         positions, _ = self.joint_states()

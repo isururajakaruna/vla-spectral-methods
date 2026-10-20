@@ -34,6 +34,7 @@ from .so101 import (
 from .spectrum import (
     InverseSpectrumModule,
     create_spectrum_module,
+    decode_model_spectrum,
     parse_freq_band,
 )
 from .vla import PromptResolver
@@ -277,6 +278,7 @@ class ModularExecutionPipeline:
         self.raw_policy_actions: list[list[float]] = []
         self.reconstructed_actions: list[list[float]] = []
         self.model_latencies: list[float] = []
+        self.clamped_actions = 0
         self.spectrum_decode_latencies: list[float] = []
         self.compression_ratios: list[float] = []
         self._debug_items: list[int] = []
@@ -356,8 +358,16 @@ class ModularExecutionPipeline:
                 raw_chunk = raw_chunk[: self.chunk_size]
 
                 # Pass through InverseSpectrumModule if FAST / spectral mode is enabled
+                model_spectrum = getattr(self.policy, "last_spectrum", None)
                 t_dec0 = time.perf_counter()
-                if self.spectrum_module.fast_tokenization:
+                if model_spectrum is not None and self.spectrum_module.fast_tokenization:
+                    self.compression_ratios.append(
+                        float(model_spectrum.get("non_zero_ratio", 1.0))
+                    )
+                    exec_chunk = decode_model_spectrum(
+                        self.spectrum_module, model_spectrum, prev_chunk_tail=prev_chunk_tail
+                    )[: self.chunk_size]
+                elif self.spectrum_module.fast_tokenization:
                     encoded_payload = self.spectrum_module.encode(raw_chunk)
                     self.compression_ratios.append(
                         float(encoded_payload.get("non_zero_ratio", 1.0))
@@ -415,6 +425,10 @@ class ModularExecutionPipeline:
             self.simulation.step(20)
             if self._is_task_complete(body_id, destination, is_so101) and self.simulation.collision_count == 0:
                 failure_reason = None
+        if self.simulation.collision_count > 0:
+            failure_reason = (
+                f"Robot collided with an obstacle ({self.simulation.collision_count} contact steps)"
+            )
 
         wall_elapsed = time.perf_counter() - started_wall
         final_obj = self.simulation.object_position(body_id)
@@ -441,6 +455,7 @@ class ModularExecutionPipeline:
         return {
             "model": self.model_name,
             "checkpoint": self.checkpoint,
+            "clamped_actions": self.clamped_actions,
             "robot": spec.robot,
             "seed": spec.seed,
             "prompt": spec.prompt,
@@ -462,8 +477,11 @@ class ModularExecutionPipeline:
         lower, upper = self.simulation.joint_limits()
         command = np.clip(command, lower, upper)
         current = self.simulation.joint_states()[0]
-        if np.any(np.abs(command - current) > np.deg2rad(45.0)):
-            raise ValueError("Action exceeds SO-101 per-step joint displacement limit")
+        max_step = np.deg2rad(45.0)
+        if np.any(np.abs(command - current) > max_step):
+            # Same behaviour as LeRobot's `max_relative_target` safety clamp on real arms.
+            command = np.clip(command, current - max_step, current + max_step)
+            self.clamped_actions += 1
         self.simulation.command_joints(command)
         body_id = self.simulation.object_ids[object_name]
         policy_gripper = float(policy_action[5])
@@ -477,10 +495,7 @@ class ModularExecutionPipeline:
             self.simulation.unlock_attached_height()
             self.simulation.release_object()
 
-        before = self.simulation.collision_count
         self.simulation.step(steps)
-        if self.simulation.collision_count > before:
-            raise ValueError("Action caused an obstacle collision")
         self.joint_samples.append(command.tolist())
 
     def _step_scara(self, policy_action: np.ndarray, object_name: str, steps: int) -> None:
@@ -501,10 +516,7 @@ class ModularExecutionPipeline:
             self.simulation.unlock_attached_height()
             self.simulation.release_object()
 
-        before = self.simulation.collision_count
         self.simulation.step(steps)
-        if self.simulation.collision_count > before:
-            raise ValueError("Action caused an obstacle collision")
         self.joint_samples.append(command.tolist())
 
     def _is_task_complete(

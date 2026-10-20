@@ -95,9 +95,21 @@ def decode_request(message: dict):
     return image, state, str(message["prompt"])
 
 
+def request_once(message: dict, host: str = "127.0.0.1", port: int = 5478, timeout: float = 30.0) -> dict:
+    """Send one request on a fresh connection and return the response, raising on server errors."""
+    with socket.create_connection((host, port), timeout=timeout) as connection:
+        send_message(connection, message)
+        response = receive_message(connection)
+    if "error" in response:
+        raise RuntimeError(response["error"])
+    return response
+
+
 class SocketActionChunkPolicy:
     def __init__(self, host: str = "127.0.0.1", port: int = 5478, timeout: float = 30.0):
         self.connection = socket.create_connection((host, port), timeout=timeout)
+        # DCT coefficients behind the last chunk, for models that emit spectral tokens.
+        self.last_spectrum: dict | None = None
 
     def predict_action_chunk(self, image, state, instruction) -> np.ndarray:
         request = (
@@ -109,6 +121,7 @@ class SocketActionChunkPolicy:
         response = receive_message(self.connection)
         if "error" in response:
             raise RuntimeError(response["error"])
+        self.last_spectrum = response.get("spectrum")
         return np.asarray(response["actions"], dtype=float)
 
     def close(self) -> None:

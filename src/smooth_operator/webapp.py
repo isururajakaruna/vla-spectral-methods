@@ -22,6 +22,7 @@ import io
 import json
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -33,6 +34,8 @@ import numpy as np
 from PIL import Image, ImageDraw
 import pybullet as p
 
+from .inference_manager import InferenceServerManager, find_vla_python
+from .inference_protocol import SocketActionChunkPolicy, request_once
 from .metrics import save_spectral_diagnostic_chart
 from .motion import DESTINATION_XY as SCARA_DEFAULT_DEST
 from .pipeline import (
@@ -46,6 +49,19 @@ from .planning import WORKSPACE as SCARA_WORKSPACE
 from .simulation import ManipulatorSimulation
 from .so101 import SO101AStarController, SO101Simulation
 from .spectrum import create_spectrum_module, parse_freq_band
+from .video import encode_mp4_video
+from .libero_env import load_libero_tasks
+from .vla_models import (
+    DEFAULT_ARRANGEMENT,
+    MODEL_FAMILIES,
+    MODEL_SPECS,
+    SIM_SIDE,
+    SIM_TOP,
+    SIM_WRIST,
+    domain_of,
+    finetuned_spec,
+    get_model_spec,
+)
 
 
 ARRANGEMENT_CATALOG: dict[str, dict[str, Any]] = {
@@ -282,147 +298,291 @@ ARRANGEMENT_CATALOG: dict[str, dict[str, Any]] = {
 }
 
 
-MODEL_CATALOG: dict[str, list[dict[str, Any]]] = {
-    "time_domain": [
-        {
-            "id": "td_astar_direct",
-            "name": "A* Oracle Policy (Direct Time-Domain)",
-            "model": "astar_oracle",
-            "version": "SO101-AStar v3.0 (Exact IK + Collision Corridor)",
-            "checkpoint": "built-in/astar_oracle_v3.0",
-            "fast_tokenization": False,
-            "spectrum_schema": "direct",
-            "freq_band": "0.0,1.0",
-            "badge": "A* Oracle v3.0 | Direct TD",
-            "description": (
-                "Executes raw 10-step joint position action chunks directly in the time domain "
-                "without spectral decomposition or inter-chunk smoothing (fast_tokenization=False)."
-            ),
-        },
-        {
-            "id": "td_smolvla_direct",
-            "name": "SmolVLA Pretrained / Fine-Tuned (Direct Time-Domain)",
-            "model": "smolvla",
-            "version": "SmolVLA-Base v0.4.3 (lerobot/smolvla_base | 450M)",
-            "checkpoint": "lerobot/smolvla_base",
-            "fast_tokenization": False,
-            "spectrum_schema": "direct",
-            "freq_band": "0.0,1.0",
-            "badge": "SmolVLA v0.4.3 | Direct TD",
-            "description": (
-                "Queries the SmolVLA Vision-Language-Action model over TCP socket and applies "
-                "predicted continuous time-domain action chunks directly to the robot."
-            ),
-        },
-    ],
-    "frequency_domain": [
-        {
-            "id": "fd_custom_hybrid",
-            "name": "Proposed Custom Hybrid Spectrum (Channel-Decoupled Butterworth DCT + C1 Blend)",
-            "model": "astar_oracle",
-            "version": "CustomHybrid-DCT v2.1 (Butterworth + C1 Blend)",
-            "checkpoint": "smooth-operator/custom_hybrid_v2.1",
-            "fast_tokenization": True,
-            "spectrum_schema": "custom_hybrid",
-            "freq_band": "0.0,0.35",
-            "badge": "CustomHybrid v2.1 (Ours)",
-            "description": (
-                "Decouples arm transport joints (3rd-order Butterworth DCT low-pass filtering) from "
-                "the discrete gripper jaw channel (step-preserving trace) and applies C1 cosine-squared "
-                "velocity blending across 10-step chunk boundaries."
-            ),
-        },
-        {
-            "id": "fd_fast_idct",
-            "name": "Standard FAST Tokenization (Full-Band Orthonormal DCT-II / IDCT-III)",
-            "model": "astar_oracle",
-            "version": "FAST-DCT v1.0 (Physical Intelligence Spec)",
-            "checkpoint": "fast-tokenizer/dct_ii_v1.0",
-            "fast_tokenization": True,
-            "spectrum_schema": "fast_idct",
-            "freq_band": "0.0,1.0",
-            "badge": "FAST-DCT v1.0 | Full-Band",
-            "description": (
-                "Encodes 10-step action chunks into quantized orthonormal DCT-II tokens and reconstructs "
-                "via full-band Type-III Inverse DCT."
-            ),
-        },
-        {
-            "id": "fd_band_idct",
-            "name": "Band-Limited IDCT (Low-Pass Frequency Truncated DCT)",
-            "model": "astar_oracle",
-            "version": "BandIDCT v1.2 (Butterworth Spectral Window)",
-            "checkpoint": "smooth-operator/band_idct_v1.2",
-            "fast_tokenization": True,
-            "spectrum_schema": "band_idct",
-            "freq_band": "0.0,0.35",
-            "badge": "Band-IDCT v1.2 | Low-Pass",
-            "description": (
-                "Attenuates high-frequency DCT modes above the normalized cutoff frequency using a "
-                "Butterworth spectral window before IDCT reconstruction."
-            ),
-        },
-        {
-            "id": "fd_ifft",
-            "name": "Inverse Fast Fourier Transform (Trend-Removed RFFT / IRFFT)",
-            "model": "astar_oracle",
-            "version": "IRFFT-Detrend v1.1 (Harmonic Fourier)",
-            "checkpoint": "smooth-operator/ifft_v1.1",
-            "fast_tokenization": True,
-            "spectrum_schema": "ifft",
-            "freq_band": "0.0,0.40",
-            "badge": "IRFFT v1.1 | Fourier Basis",
-            "description": (
-                "Removes linear chunk endpoint trend, filters complex RFFT harmonics in the frequency "
-                "domain, and reconstructs via Inverse Real FFT."
-            ),
-        },
-        {
-            "id": "fd_idwt_haar",
-            "name": "Haar Discrete Wavelet Reconstruction (2-Level Periodic IDWT)",
-            "model": "astar_oracle",
-            "version": "Haar-DWT v1.0 (2-Level Multi-Resolution)",
-            "checkpoint": "smooth-operator/idwt_haar_v1.0",
-            "fast_tokenization": True,
-            "spectrum_schema": "idwt_haar",
-            "freq_band": "0.0,0.50",
-            "badge": "Haar-IDWT v1.0 | Wavelet",
-            "description": (
-                "Multi-resolution 2-level Haar wavelet decomposition with soft-thresholding on "
-                "high-frequency detail coefficients."
-            ),
-        },
-        {
-            "id": "fd_idwt_db4",
-            "name": "Daubechies-4 Wavelet Reconstruction (2-Level Periodic DB4 IDWT)",
-            "model": "astar_oracle",
-            "version": "Daubechies-DB4 v1.0 (4-Tap Orthogonal Wavelet)",
-            "checkpoint": "smooth-operator/idwt_db4_v1.0",
-            "fast_tokenization": True,
-            "spectrum_schema": "idwt_db4",
-            "freq_band": "0.0,0.50",
-            "badge": "DB4-IDWT v1.0 | Wavelet",
-            "description": (
-                "Smooth 4-tap Daubechies orthogonal wavelet filter bank with multi-scale detail shrinkage."
-            ),
-        },
-        {
-            "id": "fd_smolvla_hybrid",
-            "name": "SmolVLA + Proposed Custom Hybrid Spectrum Decoder",
-            "model": "smolvla",
-            "version": "SmolVLA v0.4.3 + CustomHybrid v2.1",
-            "checkpoint": "lerobot/smolvla_base + custom_hybrid_v2.1",
-            "fast_tokenization": True,
-            "spectrum_schema": "custom_hybrid",
-            "freq_band": "0.0,0.35",
-            "badge": "SmolVLA v0.4.3 + Hybrid v2.1",
-            "description": (
-                "Combines neural SmolVLA action chunk generation with our Channel-Decoupled + C1 "
-                "Boundary-Blended Inverse Spectrum Module."
-            ),
-        },
-    ],
+LIBERO_SUITES = {
+    "libero_object": ("LIBERO-Object", "Pick one of several grocery items and place it in the basket."),
+    "libero_spatial": ("LIBERO-Spatial", "Identical bowls in different layouts: put the one described by its position on the plate."),
+    "libero_goal": ("LIBERO-Goal", "One fixed scene with ten different goals (drawers, stove, plates, wine bottle)."),
+    "libero_10": ("LIBERO-Long", "Long-horizon tasks that chain two sub-goals across kitchen and living-room scenes."),
 }
+LIBERO_CAMERAS = [
+    {
+        "id": "agentview",
+        "name": "Agent View",
+        "eye": "Fixed, across the table facing the robot",
+        "target": "Workspace",
+        "fov_deg": 45,
+        "role": "Model input observation.images.image",
+    },
+    {
+        "id": "wrist",
+        "name": "Wrist Eye-in-Hand",
+        "eye": "Mounted on the Panda hand",
+        "target": "Between the fingers",
+        "fov_deg": 75,
+        "role": "Model input observation.images.image2",
+    },
+    {
+        "id": "frontview",
+        "name": "Front View",
+        "eye": "Fixed, in front of the table",
+        "target": "Whole scene",
+        "fov_deg": 45,
+        "role": "Recording only, not a model input",
+    },
+]
+
+
+def _libero_arrangements() -> dict[str, dict[str, Any]]:
+    tasks = load_libero_tasks()
+    arrangements: dict[str, dict[str, Any]] = {}
+    for suite, (label, description) in LIBERO_SUITES.items():
+        arrangements[suite] = {
+            "id": suite,
+            "title": f"LIBERO — {label} (Franka Panda, MuJoCo)",
+            "robot": "libero",
+            "seed": None,
+            "suite": suite,
+            "max_steps": tasks[suite]["max_steps"],
+            "badge": "7-DoF Franka Panda | 20 Hz | MuJoCo",
+            "description": (
+                f"{description} The benchmark LeRobot's LIBERO checkpoints were fine-tuned on, so models "
+                "act in the setting they were trained for. Each prompt below is one benchmark task."
+            ),
+            "cameras": LIBERO_CAMERAS,
+            "prompts": [
+                {"label": f"Task {t['task_id']}", "prompt": t["language"], "category": f"Task {t['task_id']}", "task_id": t["task_id"]}
+                for t in tasks[suite]["tasks"]
+            ],
+        }
+    return arrangements
+
+
+ARRANGEMENT_CATALOG.update(_libero_arrangements())
+
+
+SPECTRAL_DECODERS = ["custom_hybrid", "fast_idct", "band_idct", "ifft", "idwt_haar", "idwt_db4"]
+
+DECODER_CATALOG: dict[str, dict[str, Any]] = {
+    "direct": {
+        "id": "direct",
+        "name": "Direct",
+        "domain": "time_domain",
+        "default_band": "0.0,1.0",
+        "uses_band": False,
+        "uses_quant": False,
+        "description": "Executes the action chunk exactly as the model predicted it, with no spectral processing.",
+    },
+    "custom_hybrid": {
+        "id": "custom_hybrid",
+        "name": "Hybrid DCT + C1 blend (ours)",
+        "domain": "frequency_domain",
+        "default_band": "0.0,0.35",
+        "uses_band": True,
+        "uses_quant": True,
+        "description": (
+            "Arm joints go through a quantized, Butterworth-windowed DCT; the gripper channel keeps its "
+            "step shape; consecutive chunks are joined with a C1 cosine blend."
+        ),
+    },
+    "fast_idct": {
+        "id": "fast_idct",
+        "name": "FAST DCT tokens",
+        "domain": "frequency_domain",
+        "default_band": "0.0,1.0",
+        "uses_band": True,
+        "uses_quant": True,
+        "description": "Quantized DCT-II coefficients (FAST tokenization), reconstructed with the inverse DCT.",
+    },
+    "band_idct": {
+        "id": "band_idct",
+        "name": "Band-limited IDCT",
+        "domain": "frequency_domain",
+        "default_band": "0.0,0.35",
+        "uses_band": True,
+        "uses_quant": True,
+        "description": "DCT coefficients attenuated outside the band by a Butterworth window, then inverted.",
+    },
+    "ifft": {
+        "id": "ifft",
+        "name": "Detrended IRFFT",
+        "domain": "frequency_domain",
+        "default_band": "0.0,0.40",
+        "uses_band": True,
+        "uses_quant": True,
+        "description": "Endpoint trend removed, real-FFT harmonics filtered to the band, inverse real FFT.",
+    },
+    "idwt_haar": {
+        "id": "idwt_haar",
+        "name": "Haar IDWT",
+        "domain": "frequency_domain",
+        "default_band": "0.0,0.50",
+        "uses_band": True,
+        "uses_quant": False,
+        "description": "2-level Haar wavelet decomposition with detail shrinkage, inverse DWT.",
+    },
+    "idwt_db4": {
+        "id": "idwt_db4",
+        "name": "Daubechies-4 IDWT",
+        "domain": "frequency_domain",
+        "default_band": "0.0,0.50",
+        "uses_band": True,
+        "uses_quant": False,
+        "description": "2-level Daubechies-4 wavelet decomposition with detail shrinkage, inverse DWT.",
+    },
+}
+
+SCRIPTED_BASELINE: dict[str, Any] = {
+    "id": "astar_expert",
+    "kind": "scripted",
+    "name": "A* expert planner (baseline)",
+    "family": "Scripted baseline",
+    "badge": "Not a VLA · privileged state",
+    "checkpoint": None,
+    "parameters": "—",
+    "robots": ["so101", "scara"],
+    "inputs": "Exact simulator state (object and obstacle poses); ignores cameras",
+    "native_output": "Planned joint-position trajectory, replayed in chunks",
+    "domain": "time_domain",
+    "available": True,
+    # Spectral decoders re-encode the planned trajectory, which is how decoders are compared.
+    "decoders": ["direct", *SPECTRAL_DECODERS],
+    "description": (
+        "Scripted reference controller with no learned weights. It plans with ground-truth poses, so it "
+        "is an upper bound for comparing decoders, not a model under test. Its frequency-domain decoders "
+        "encode and decode the planned trajectory."
+    ),
+}
+
+NATIVE_OUTPUT_TEXT = {
+    "continuous": "Continuous joint-position action chunk",
+    "dct_tokens": "FAST tokens (quantized DCT-II coefficients of the action chunk)",
+}
+CAMERA_LABELS = {SIM_TOP: "top", SIM_WRIST: "wrist", SIM_SIDE: "side"}
+
+
+ROBOT_LABELS = {
+    "so101": "SO-101 (PyBullet)",
+    "scara": "SCARA (PyBullet)",
+    "libero": "LIBERO (Franka Panda, MuJoCo)",
+}
+
+
+def _variant_entry(spec: dict[str, Any]) -> dict[str, Any]:
+    """Catalog view of one checkpoint, i.e. one model on one embodiment."""
+    cameras = spec.get("camera_map", {}).values()
+    camera_text = ", ".join(CAMERA_LABELS[c] for c in cameras) if cameras else "model-specific cameras"
+    return {
+        **spec,
+        "kind": "vla",
+        "robots": [spec["embodiment"]],
+        "decoders": list(spec["decoders"]),
+        "domain": domain_of(spec),
+        "available": "unavailable_reason" not in spec,
+        "inputs": spec.get("inputs") or f"RGB cameras ({camera_text}) + 6-D joint state + language prompt",
+        "native_output": f"{NATIVE_OUTPUT_TEXT[spec['native_output']]} — {spec['action_head']}",
+    }
+
+
+def _family_entry(family_id: str, name: str, variants: dict[str, dict[str, Any]], kind: str = "vla") -> dict[str, Any]:
+    """One model as listed in the studio; `variants` maps each embodiment to its checkpoint entry."""
+    runnable = [robot for robot, v in variants.items() if v["available"]]
+    lead = variants[runnable[0]] if runnable else next(iter(variants.values()))
+    if len({v["domain"] for v in variants.values()}) != 1:
+        raise ValueError(f"{name} variants disagree on action domain")
+    default_robot = runnable[0] if runnable else next(iter(variants))
+    return {
+        **lead,
+        "id": family_id,
+        "name": name,
+        "kind": kind,
+        "available": bool(runnable),
+        "robots": runnable,
+        "default_arrangement": DEFAULT_ARRANGEMENT[default_robot],
+        "variants": variants,
+    }
+
+
+FINETUNE_BASES = {
+    "smolvla": "smolvla_base",
+    "pi0": "pi0_base",
+    "pi05": "pi05_base",
+    "molmoact2": "molmoact2_so100",
+}
+
+
+def discover_finetuned_checkpoints(root: Path = Path("checkpoints")) -> list[dict[str, Any]]:
+    """Return model specs for local fine-tunes saved by `lerobot-train`."""
+    specs: list[dict[str, Any]] = []
+    if not root.exists():
+        return specs
+    for config_path in sorted(root.glob("**/pretrained_model/config.json")):
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        base_id = FINETUNE_BASES.get(config.get("type"))
+        if base_id is None:
+            continue
+        model_dir = config_path.parent
+        label = str(model_dir.relative_to(root).parent)
+        base_name = get_model_spec(base_id)["name"]
+        specs.append(
+            finetuned_spec(base_id, f"{base_id}_ft:{label}", f"{base_name} fine-tuned ({label})", str(model_dir.resolve()))
+        )
+    return specs
+
+
+def model_catalog() -> list[dict[str, Any]]:
+    families = [
+        _family_entry(f["id"], f["name"], {robot: _variant_entry(get_model_spec(sid)) for robot, sid in f["variants"].items()})
+        for f in MODEL_FAMILIES
+    ]
+    families += [
+        _family_entry(spec["id"], spec["name"], {spec["embodiment"]: _variant_entry(spec)})
+        for spec in discover_finetuned_checkpoints()
+    ]
+    baseline = _family_entry(
+        SCRIPTED_BASELINE["id"],
+        SCRIPTED_BASELINE["name"],
+        {robot: {**SCRIPTED_BASELINE, "robots": [robot]} for robot in SCRIPTED_BASELINE["robots"]},
+        kind="scripted",
+    )
+    return [*(f for f in families if f["available"]), baseline, *(f for f in families if not f["available"])]
+
+
+def _resolve_model(model_id: str) -> dict[str, Any]:
+    """Find a model by family id, or by the id of one of its checkpoints."""
+    catalog = model_catalog()
+    for entry in catalog:
+        if entry["id"] == model_id:
+            return entry
+    for entry in catalog:
+        if any(v["id"] == model_id for v in entry["variants"].values()):
+            return entry
+    raise ValueError(f"Unknown model {model_id!r}")
+
+
+def resolve_variant(model_id: str, robot: str) -> dict[str, Any]:
+    """The checkpoint of `model_id` for an environment's embodiment, or a ValueError saying why none runs."""
+    family = _resolve_model(model_id)
+    variant = family["variants"].get(robot)
+    if variant is None:
+        options = ", ".join(ROBOT_LABELS[r] for r in family["robots"]) or "no environment yet"
+        raise ValueError(f"{family['name']} has no checkpoint for {ROBOT_LABELS[robot]}; it runs on {options}")
+    if not variant["available"]:
+        raise ValueError(f"{variant['name']} cannot run on {ROBOT_LABELS[robot]}: {variant['unavailable_reason']}")
+    return variant
+
+
+def _server_spec(model: dict[str, Any]) -> dict[str, Any]:
+    """The model spec as the inference server expects it (catalog-only fields removed)."""
+    for spec in [*MODEL_SPECS, *discover_finetuned_checkpoints()]:
+        if spec["id"] == model["id"]:
+            return spec
+    raise ValueError(f"{model['name']} is not served by the inference server")
+
+
+_INFERENCE = InferenceServerManager()
 
 
 def get_gpu_hardware_status() -> dict[str, Any]:
@@ -596,14 +756,53 @@ def _render_so101_wrist_camera(sim: SO101Simulation, width: int = 640, height: i
     return sim._render_camera(eye.tolist(), target.tolist(), wrist_up.tolist(), width, height)
 
 
-def build_arrangement_preview(arrangement_id: str) -> dict[str, Any]:
-    """Render live PyBullet camera views and scene metadata for the chosen robotic arrangement."""
-    if arrangement_id in _PREVIEW_CACHE:
-        return _PREVIEW_CACHE[arrangement_id]
+LIBERO_PREVIEW_DIR = Path("data/previews/libero")
+PANDA_JOINT_NAMES = [f"panda_joint{i}" for i in range(1, 8)] + ["panda_finger_joints"]
+
+
+def _libero_preview(cfg: dict[str, Any], task_id: int) -> dict[str, Any]:
+    """Render a LIBERO task's initial scene in the VLA environment (MuJoCo), cached on disk."""
+    suite = cfg["suite"]
+    if not 0 <= task_id < len(cfg["prompts"]):
+        raise ValueError(f"{cfg['title']} has no task {task_id}")
+    out = LIBERO_PREVIEW_DIR / f"{suite}_{task_id}.json"
+    if not out.exists():
+        python = find_vla_python()
+        if python is None:
+            raise RuntimeError("LIBERO previews need the Python 3.12 LeRobot environment")
+        result = subprocess.run(
+            [str(python), "-m", "smooth_operator.libero_env", "--suite", suite, "--task-id", str(task_id), "--out", str(out)],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if not out.exists():
+            raise RuntimeError(f"LIBERO preview failed: {(result.stdout + result.stderr).strip()[-800:]}")
+    rendered = json.loads(out.read_text(encoding="utf-8"))
+    return {
+        **cfg,
+        "task_id": task_id,
+        "task": rendered["task"],
+        "joint_names": PANDA_JOINT_NAMES,
+        "objects": rendered["objects"],
+        "obstacles": [],
+        "default_destination": None,
+        "camera_images": rendered["camera_images"],
+        "schematic_image": rendered["camera_images"]["frontview"],
+    }
+
+
+def build_arrangement_preview(arrangement_id: str, task_id: int = 0) -> dict[str, Any]:
+    """Render live camera views and scene metadata for the chosen arrangement (and LIBERO task)."""
     if arrangement_id not in ARRANGEMENT_CATALOG:
         raise ValueError(f"Unknown arrangement_id {arrangement_id!r}")
-
     cfg = ARRANGEMENT_CATALOG[arrangement_id]
+    if cfg["robot"] == "libero":
+        return _libero_preview(cfg, task_id)
+    if arrangement_id in _PREVIEW_CACHE:
+        return _PREVIEW_CACHE[arrangement_id]
+
     robot = cfg["robot"]
     seed = cfg["seed"]
     sim_cls = SO101Simulation if robot == "so101" else ManipulatorSimulation
@@ -754,80 +953,6 @@ def _render_scene_view(sim: Any, robot: str, frame_idx: int) -> np.ndarray:
     return np.asarray(rgba, dtype=np.uint8).reshape(height, width, 4)[:, :, :3]
 
 
-def _encode_mp4_video(frames: list[np.ndarray], out_path: Path, fps: int = 12) -> bool:
-    """Encode a list of RGB24 uint8 frames into a browser-compatible H.264 MP4 video via ffmpeg."""
-    if not frames:
-        return False
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    h, w, _ = frames[0].shape
-    ffmpeg_bin = shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
-    cmd = [
-        ffmpeg_bin,
-        "-y",
-        "-loglevel",
-        "error",
-        "-f",
-        "rawvideo",
-        "-vcodec",
-        "rawvideo",
-        "-s",
-        f"{w}x{h}",
-        "-pix_fmt",
-        "rgb24",
-        "-r",
-        str(fps),
-        "-i",
-        "-",
-        "-c:v",
-        "libx264",
-        "-pix_fmt",
-        "yuv420p",
-        "-preset",
-        "ultrafast",
-        "-crf",
-        "23",
-        "-movflags",
-        "+faststart",
-        str(out_path),
-    ]
-    try:
-        raw_bytes = b"".join(np.ascontiguousarray(f, dtype=np.uint8).tobytes() for f in frames)
-        subprocess.run(cmd, input=raw_bytes, check=True, timeout=20.0)
-        return out_path.exists()
-    except Exception:
-        return False
-
-
-def _find_model_entry(
-    model_id: Optional[str],
-    model_name: str,
-    spectrum_schema: str,
-    fast_tokenization: bool,
-) -> dict[str, Any]:
-    """Resolve full model metadata from MODEL_CATALOG."""
-    for domain_key, items in MODEL_CATALOG.items():
-        for entry in items:
-            if model_id and entry["id"] == model_id:
-                return {**entry, "domain": domain_key}
-    for domain_key, items in MODEL_CATALOG.items():
-        for entry in items:
-            if (
-                entry["model"] == model_name
-                and entry["spectrum_schema"] == spectrum_schema
-                and bool(entry["fast_tokenization"]) == bool(fast_tokenization)
-            ):
-                return {**entry, "domain": domain_key}
-    return {
-        "id": model_id or f"{model_name}_{spectrum_schema}",
-        "name": f"{model_name} ({spectrum_schema})",
-        "model": model_name,
-        "version": f"{model_name} ({spectrum_schema})",
-        "checkpoint": model_name,
-        "badge": spectrum_schema.upper(),
-        "domain": "frequency_domain" if fast_tokenization else "time_domain",
-    }
-
-
 def list_saved_runs() -> list[dict[str, Any]]:
     """Return all saved runs from data/runs sorted by timestamp folder name (newest first)."""
     if not RUNS_DIR.exists():
@@ -848,32 +973,173 @@ def list_saved_runs() -> list[dict[str, Any]]:
     return runs
 
 
+def _relay_live_frames(run_dir: Path, done: threading.Event) -> None:
+    """Forward the frames a LIBERO rollout writes in the VLA process to the live MJPEG stream."""
+    live = run_dir / "live.jpg"
+    last_mtime = 0.0
+    while not done.wait(1.0 / VIDEO_FPS):
+        try:
+            mtime = live.stat().st_mtime
+            if mtime != last_mtime:
+                last_mtime = mtime
+                _LIVE_BROKER.publish(np.asarray(Image.open(live).convert("RGB")))
+        except (OSError, ValueError):
+            continue
+
+
+def execute_libero_launch(params: dict[str, Any], cfg: dict[str, Any], model_meta: dict[str, Any]) -> dict[str, Any]:
+    """Run a LIBERO checkpoint closed-loop on a LIBERO task inside the VLA process."""
+    decoder_id = str(params.get("decoder", "direct"))
+    decoder_meta = DECODER_CATALOG[decoder_id]
+    task_id = int(params.get("task_id", 0))
+    if not 0 <= task_id < len(cfg["prompts"]):
+        raise ValueError(f"{cfg['title']} has no task {task_id}")
+    prompt = str(params.get("prompt") or cfg["prompts"][task_id]["prompt"]).strip()
+    init_state = int(params.get("init_state", 0))
+    quant_scale = float(params.get("quant_scale", 40.0))
+    freq_band = (
+        parse_freq_band(str(params.get("freq_band") or decoder_meta["default_band"]))
+        if decoder_meta["uses_band"]
+        else (0.0, 1.0)
+    )
+    port = _INFERENCE.ensure_ready(_server_spec(model_meta))
+
+    now = datetime.now()
+    run_id = now.strftime("%Y%m%d_%H%M%S_%f")[:19]
+    run_dir = RUNS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    request = {
+        "type": "libero_rollout",
+        "suite": cfg["suite"],
+        "task_id": task_id,
+        "init_state": init_state,
+        "instruction": prompt,
+        "decoder": decoder_id,
+        "freq_band": list(freq_band),
+        "quant_scale": quant_scale,
+        "run_dir": str(run_dir.resolve()),
+        "model_name": model_meta["name"],
+    }
+    done = threading.Event()
+    with _SIM_LOCK:
+        _LIVE_BROKER.start(run_id)
+        relay = threading.Thread(target=_relay_live_frames, args=(run_dir, done), daemon=True)
+        relay.start()
+        try:
+            result = request_once(request, port=port, timeout=1800.0)
+        finally:
+            done.set()
+            relay.join(timeout=2.0)
+            _LIVE_BROKER.finish()
+
+    saved_cameras = [
+        {
+            **cam,
+            "video_file": f"{cam['id']}.mp4",
+            "video_url": f"/api/runs/{run_id}/{cam['id']}.mp4",
+            "frame_count": result["videos"][cam["id"]]["frame_count"],
+        }
+        for cam in cfg["cameras"]
+        if cam["id"] != "frontview" and result["videos"][cam["id"]]["ok"]
+    ]
+    scene_video = None
+    if result["videos"]["frontview"]["ok"]:
+        scene_video = {
+            "id": "frontview",
+            "name": "Front View",
+            "role": "External view of the robot and table",
+            "video_file": "frontview.mp4",
+            "video_url": f"/api/runs/{run_id}/frontview.mp4",
+            "frame_count": result["videos"]["frontview"]["frame_count"],
+        }
+    metrics = result["metrics"]
+    run_metadata: dict[str, Any] = {
+        "run_id": run_id,
+        "run_dir": f"data/runs/{run_id}",
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp_iso": now.isoformat(),
+        "model_id": model_meta["id"],
+        "model": model_meta["id"],
+        "model_display_name": model_meta["name"],
+        "model_kind": model_meta["kind"],
+        "model_version": decoder_meta["name"],
+        "model_badge": model_meta["badge"],
+        "model_native_output": model_meta["native_output"],
+        "checkpoint": model_meta["checkpoint"],
+        "domain": decoder_meta["domain"],
+        "decoder": decoder_id,
+        "decoder_name": decoder_meta["name"],
+        "fast_tokenization": decoder_id != "direct",
+        "spectrum_schema": decoder_id,
+        "freq_band": list(freq_band),
+        "quant_scale": quant_scale,
+        "arrangement_id": cfg["id"],
+        "arrangement_title": cfg["title"],
+        "robot": "libero",
+        "robot_badge": cfg["badge"],
+        "seed": init_state,
+        "libero_task_id": task_id,
+        "prompt": prompt,
+        "cli_command": f"LIBERO {cfg['suite']} task {task_id}, init state {init_state} (in the inference server)",
+        "gui_launched": False,
+        "gui_pid": None,
+        "camera_count": len(saved_cameras),
+        "cameras": saved_cameras,
+        "scene_video": scene_video,
+        "chart_url": f"/api/runs/{run_id}/diagnostic_chart.png",
+        "metrics": metrics,
+    }
+    (run_dir / "metadata.json").write_text(json.dumps(run_metadata, indent=2), encoding="utf-8")
+    chart_path = run_dir / "diagnostic_chart.png"
+    return {
+        "status": "ok",
+        "run": run_metadata,
+        "gui_launched": False,
+        "gui_pid": None,
+        "cli_command": run_metadata["cli_command"],
+        "metrics": metrics,
+        "diagnostic_chart": "data:image/png;base64," + base64.b64encode(chart_path.read_bytes()).decode("ascii"),
+    }
+
+
 def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
-    """Run the selected model, spectrum schema, arrangement, and prompt; save multi-camera MP4 videos & metadata to data/runs."""
+    """Run the selected model and decoder on an arrangement; save camera videos and metadata to data/runs."""
     global _ACTIVE_GUI_PROCESS
     arrangement_id = str(params.get("arrangement_id", "so101_seed_9"))
     cfg = ARRANGEMENT_CATALOG.get(arrangement_id, ARRANGEMENT_CATALOG["so101_seed_9"])
     robot = str(cfg["robot"])
     seed = cfg["seed"]
 
-    model_id = str(params.get("model_id", "")) or None
-    model_name = str(params.get("model", "astar_oracle"))
-    fast_tokenization = bool(params.get("fast_tokenization", True))
-    spectrum_schema = str(params.get("spectrum_schema", "custom_hybrid"))
-    freq_band_str = str(params.get("freq_band", "0.0,0.35"))
+    model_meta = resolve_variant(str(params.get("model_id", "smolvla")), robot)
+    decoder_id = str(params.get("decoder", "direct"))
+    if decoder_id not in model_meta["decoders"]:
+        raise ValueError(f"{model_meta['name']} does not support the {decoder_id!r} decoder")
+    if robot == "libero":
+        return execute_libero_launch(params, cfg, model_meta)
+    decoder_meta = DECODER_CATALOG[decoder_id]
+    is_vla = model_meta["kind"] == "vla"
+    model_name = model_meta["id"] if is_vla else "astar_oracle"
+    cli_model = "smolvla" if is_vla else "astar_oracle"
+    fast_tokenization = decoder_id != "direct"
+
+    freq_band_str = str(params.get("freq_band") or decoder_meta["default_band"])
     quant_scale = float(params.get("quant_scale", 40.0))
     prompt = str(params.get("prompt", "Move the apple to the target")).strip()
-    open_gui = bool(params.get("open_gui", True))
+    # The PyBullet window replays the run in a separate process, which would query the VLA a second time.
+    open_gui = bool(params.get("open_gui", True)) and not is_vla
     hold_seconds = float(params.get("hold_seconds", 6.0))
 
-    freq_band = parse_freq_band(freq_band_str)
-    active_schema = spectrum_schema if fast_tokenization else "direct"
+    freq_band = parse_freq_band(freq_band_str) if decoder_meta["uses_band"] else (0.0, 1.0)
     spectrum_mod = create_spectrum_module(
-        schema=active_schema,
+        schema=decoder_id,
         freq_band=freq_band,
         quant_scale=quant_scale,
     )
-    model_meta = _find_model_entry(model_id, model_name, active_schema, fast_tokenization)
+    freq_band = tuple(spectrum_mod.freq_band)
+
+    inference_port: Optional[int] = None
+    if is_vla:
+        inference_port = _INFERENCE.ensure_ready(_server_spec(model_meta))
 
     # Create timestamp-based folder in data/runs/ so runs sort chronologically
     now = datetime.now()
@@ -881,7 +1147,6 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. If open_gui is requested, spawn the non-blocking 3D PyBullet GUI window for live viewing
     gui_pid: Optional[int] = None
     cli_cmd = [
         sys.executable,
@@ -890,19 +1155,20 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
         "--robot",
         robot,
         "--model",
-        model_name,
+        cli_model,
         "--spectrum-schema",
-        active_schema,
+        decoder_id,
         "--freq-band",
         f"{freq_band[0]},{freq_band[1]}",
         "--quant-scale",
         str(quant_scale),
         "--prompt",
         prompt,
-        "--gui",
-        "--hold",
-        str(hold_seconds),
     ]
+    if is_vla:
+        cli_cmd.extend(["--checkpoint", model_meta["checkpoint"], "--inference-port", str(inference_port)])
+    else:
+        cli_cmd.extend(["--gui", "--hold", str(hold_seconds)])
     if seed is not None:
         cli_cmd.extend(["--seed", str(seed)])
     if fast_tokenization:
@@ -918,7 +1184,7 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
         _ACTIVE_GUI_PROCESS = subprocess.Popen(cli_cmd)
         gui_pid = _ACTIVE_GUI_PROCESS.pid
 
-    # 2. Run a fast headless rollout in-process to capture multi-camera videos, telemetry, and diagnostic chart
+    # Headless rollout in-process to capture multi-camera videos, telemetry, and the diagnostic chart
     sim_cls = SO101Simulation if robot == "so101" else ManipulatorSimulation
     camera_frame_buffers: dict[str, list[np.ndarray]] = {
         cam["id"]: [] for cam in cfg["cameras"]
@@ -930,17 +1196,31 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
         with sim_cls(gui=False, training_seed=seed) as temp_sim:
             spec = resolve_scene_from_prompt(temp_sim, prompt, seed)
 
-        oracle_actions, oracle_samples, oracle_len = generate_oracle_action_sequence(spec)
-        spec.oracle_path_length_m = oracle_len
-        oracle_xy = [row[1:3] for row in oracle_samples]
+        # The expert plan is only a reference (path efficiency, chart overlay) unless it is the selected policy.
+        oracle_xy: Optional[list] = None
+        oracle_actions: Optional[np.ndarray] = None
+        try:
+            oracle_actions, oracle_samples, oracle_len = generate_oracle_action_sequence(spec)
+            spec.oracle_path_length_m = oracle_len
+            oracle_xy = [row[1:3] for row in oracle_samples]
+        except Exception:
+            if not is_vla:
+                _LIVE_BROKER.finish()
+                raise
+
+        if is_vla:
+            policy: Any = SocketActionChunkPolicy(port=inference_port, timeout=180.0)
+        else:
+            policy = PrecomputedChunkPolicy(oracle_actions, chunk_size=10)
 
         with sim_cls(gui=False, training_seed=seed) as sim:
             apply_scene_spec(sim, spec)
             pipeline = ModularExecutionPipeline(
                 simulation=sim,
-                policy=PrecomputedChunkPolicy(oracle_actions, chunk_size=10),
+                policy=policy,
                 spectrum_module=spectrum_mod,
                 model_name=model_name,
+                checkpoint=model_meta["checkpoint"] or "astar_expert",
                 realtime_gui=False,
             )
             orig_step_so101 = pipeline._step_so101
@@ -990,6 +1270,8 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
                 _capture_all_cameras()
             finally:
                 _LIVE_BROKER.finish()
+                if isinstance(policy, SocketActionChunkPolicy):
+                    policy.close()
             workspace = SO101Simulation.WORKSPACE if robot == "so101" else SCARA_WORKSPACE
             run_chart_path = run_dir / "diagnostic_chart.png"
             save_spectral_diagnostic_chart(
@@ -1017,7 +1299,7 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
         frames = camera_frame_buffers.get(cam_id, [])
         video_filename = f"{cam_id}.mp4"
         video_path = run_dir / video_filename
-        _encode_mp4_video(frames, video_path, fps=VIDEO_FPS)
+        encode_mp4_video(frames, video_path, fps=VIDEO_FPS)
         saved_cameras.append(
             {
                 "id": cam_id,
@@ -1032,7 +1314,7 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
         )
 
     scene_video: Optional[dict[str, Any]] = None
-    if _encode_mp4_video(scene_frames, run_dir / "scene3d.mp4", fps=VIDEO_FPS):
+    if encode_mp4_video(scene_frames, run_dir / "scene3d.mp4", fps=VIDEO_FPS):
         scene_video = {
             "id": "scene3d",
             "name": "3D Scene View",
@@ -1066,12 +1348,16 @@ def execute_web_launch(params: dict[str, Any]) -> dict[str, Any]:
         "model_id": model_meta["id"],
         "model": model_name,
         "model_display_name": model_meta["name"],
-        "model_version": model_meta["version"],
+        "model_kind": model_meta["kind"],
+        "model_version": decoder_meta["name"],
         "model_badge": model_meta["badge"],
-        "checkpoint": model_meta["checkpoint"],
-        "domain": model_meta["domain"],
+        "model_native_output": model_meta["native_output"],
+        "checkpoint": model_meta["checkpoint"] or "—",
+        "domain": decoder_meta["domain"],
+        "decoder": decoder_id,
+        "decoder_name": decoder_meta["name"],
         "fast_tokenization": fast_tokenization,
-        "spectrum_schema": active_schema,
+        "spectrum_schema": decoder_id,
         "freq_band": list(freq_band),
         "quant_scale": quant_scale,
         "arrangement_id": arrangement_id,
@@ -1354,6 +1640,25 @@ HTML_PAGE = """<!DOCTYPE html>
       border-color: #8ab4f8;
       background: #fafbfe;
     }
+    .model-item.unavailable {
+      cursor: default;
+      opacity: 0.6;
+      background: #f8f9fa;
+    }
+    .model-item.unavailable:hover {
+      border-color: var(--border);
+      background: #f8f9fa;
+    }
+    .model-unavailable-note {
+      flex-basis: 100%;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .domain-hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
     .model-item.selected {
       border-color: var(--accent);
       background: #f8fbff;
@@ -1376,8 +1681,9 @@ HTML_PAGE = """<!DOCTYPE html>
       flex: 1;
       min-width: 0;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
+      gap: 2px 8px;
     }
     .model-name {
       font-size: 13px;
@@ -1441,6 +1747,46 @@ HTML_PAGE = """<!DOCTYPE html>
       font-size: 12px;
       color: var(--muted);
       line-height: 1.45;
+    }
+    .decoder-block {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .decoder-desc {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .param-row.disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .model-status {
+      margin-top: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .model-status:empty { display: none; }
+    .model-status .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: 0;
+      background: #9aa0a6;
+    }
+    .model-status.ready .dot { background: #1e8e3e; }
+    .model-status.loading .dot { background: #f9ab00; }
+    .model-status.error .dot, .model-status.unavailable .dot { background: #d93025; }
+    .model-status.error, .model-status.unavailable { color: #b3261e; }
+    .badge.baseline {
+      background: #f1f3f4;
+      color: #5f6368;
+      border: 1px solid #dadce0;
     }
     .param-row {
       display: grid;
@@ -2076,7 +2422,14 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
         </div>
 
+        <p class="domain-hint" id="domain-hint"></p>
         <div class="model-list" id="model-list"></div>
+
+        <div class="decoder-block">
+          <label for="decoder-select">Action decoder</label>
+          <select id="decoder-select" onchange="onDecoderChange()"></select>
+          <div class="decoder-desc" id="decoder-desc"></div>
+        </div>
 
         <div class="param-row" id="spectral-params-row">
           <div>
@@ -2088,6 +2441,8 @@ HTML_PAGE = """<!DOCTYPE html>
             <input type="number" id="quant-scale-input" value="40" step="5" min="1" max="200" />
           </div>
         </div>
+
+        <div class="model-status" id="model-status"></div>
       </div>
 
       <!-- STEP 2: ROBOT ARRANGEMENT SELECTOR -->
@@ -2095,10 +2450,10 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="step-header">
           <div class="step-title">
             <span class="step-num">2</span>
-            <span>Select Robotic Arm & Scene Arrangement</span>
+            <span>Select Environment</span>
           </div>
         </div>
-        <label for="arrangement-select">Hardware & Obstacle Arrangement Preset</label>
+        <label for="arrangement-select">Robot, scene and cameras (selecting a model opens its default; ✓ = the model has a checkpoint here)</label>
         <select id="arrangement-select" onchange="onArrangementChange()"></select>
         <p id="arrangement-desc" style="font-size:12.5px;color:var(--muted);margin:10px 0 0;line-height:1.45;"></p>
       </div>
@@ -2577,7 +2932,7 @@ HTML_PAGE = """<!DOCTYPE html>
         if (el) el.textContent = text;
       };
       setVal('lift', '+' + (m.max_vertical_lift_cm || 0).toFixed(2) + ' cm');
-      setVal('error', (m.endpoint_error_m || 0).toFixed(4) + ' m');
+      setVal('error', m.endpoint_error_m == null ? '— (LIBERO goal check)' : m.endpoint_error_m.toFixed(4) + ' m');
       setVal('jerk', (m.joint_rms_jerk_rad_s3 || 0).toFixed(1) + ' rad/s³');
       setVal('jump', (m.chunk_boundary_jump_rad_s || 0).toFixed(3) + ' rad/s');
       setVal('hfer', ((m.high_freq_energy_ratio_hfer || 0) * 100).toFixed(2) + '%');
@@ -2654,25 +3009,55 @@ HTML_PAGE = """<!DOCTYPE html>
       });
     }
 
+    // Clear everything a previous run left in the modal (videos, stats, chart, command).
+    function resetRunModal() {
+      activeRunRecord = null;
+      renderSavedRunsList();
+      const grid = document.getElementById('modal-cameras-grid');
+      grid.querySelectorAll('video').forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); });
+      grid.innerHTML = '';
+      document.getElementById('modal-cameras-label').textContent = '📹 Synchronized Multi-Camera Video Replay';
+      document.querySelectorAll('#modal-kpi-grid .kpi-val').forEach(el => {
+        el.textContent = '—';
+        el.style.color = '';
+      });
+      document.getElementById('modal-chart-img').removeAttribute('src');
+      document.getElementById('modal-chart-caption').textContent = 'The diagnostic chart appears when the run finishes.';
+      document.getElementById('modal-cli-text').textContent = '';
+      for (const id of ['modal-meta-model', 'modal-meta-version', 'modal-meta-arm', 'modal-meta-cameras',
+                        'modal-meta-prompt', 'modal-meta-schema', 'modal-meta-time', 'modal-meta-folder']) {
+        document.getElementById(id).textContent = '—';
+      }
+    }
+
     function openRunModalLoading(payload, modelObj, arrangementObj) {
+      resetRunModal();
       document.getElementById('run-modal-backdrop').classList.add('open');
       document.getElementById('run-modal-loading').style.display = 'block';
       document.getElementById('run-modal-content-body').style.opacity = '0.35';
       startLiveSceneView();
       document.getElementById('run-modal-title').textContent = 'Executing Live Simulation Run...';
       const statusBadge = document.getElementById('run-modal-status-badge');
-      statusBadge.textContent = 'Running PyBullet...';
+      statusBadge.textContent = arrangementObj && arrangementObj.robot === 'libero' ? 'Running MuJoCo...' : 'Running PyBullet...';
       statusBadge.style.background = '#fef7e0';
       statusBadge.style.color = '#b06000';
       document.getElementById('run-modal-subtitle').textContent = 'Recording multi-camera videos to data/runs/<timestamp>/...';
 
-      document.getElementById('modal-meta-model').textContent = modelObj ? modelObj.name : payload.model;
-      document.getElementById('modal-meta-version').textContent = modelObj ? `${modelObj.version} (${modelObj.checkpoint})` : payload.spectrum_schema;
+      const decoderMeta = catalogData.decoders[payload.decoder] || {};
+      document.getElementById('modal-meta-model').textContent = modelObj ? modelObj.name : payload.model_id;
+      document.getElementById('modal-meta-version').textContent =
+        `${decoderMeta.name || payload.decoder} (${(modelObj && modelObj.checkpoint) || '—'})`;
       document.getElementById('modal-meta-arm').textContent = arrangementObj ? arrangementObj.title : payload.arrangement_id;
       const camCount = arrangementObj && arrangementObj.cameras ? arrangementObj.cameras.length : 1;
       document.getElementById('modal-meta-cameras').textContent = `${camCount} Camera Stream${camCount > 1 ? 's' : ''} Active`;
       document.getElementById('modal-meta-prompt').textContent = `"${payload.prompt}"`;
-      document.getElementById('modal-meta-schema').textContent = `Schema: ${payload.spectrum_schema} | Band: [${payload.freq_band}]`;
+      document.getElementById('modal-meta-schema').textContent = payload.decoder === 'direct'
+        ? 'Decoder: direct (time domain)'
+        : `Decoder: ${payload.decoder} | Band: [${payload.freq_band}]`;
+      if (modelObj && modelObj.kind === 'vla') {
+        document.getElementById('run-modal-subtitle').textContent =
+          'Querying the model every chunk with live camera frames, joint state, and the prompt...';
+      }
       document.getElementById('modal-meta-time').textContent = new Date().toLocaleString();
       document.getElementById('modal-meta-folder').textContent = 'data/runs/ (creating timestamp folder...)';
     }
@@ -2795,40 +3180,95 @@ HTML_PAGE = """<!DOCTYPE html>
 
       const arrSelect = document.getElementById('arrangement-select');
       arrSelect.innerHTML = '';
-      for (const arr of catalogData.arrangements) {
-        const opt = document.createElement('option');
-        opt.value = arr.id;
-        opt.textContent = arr.title;
-        arrSelect.appendChild(opt);
+      const groups = [
+        ['LIBERO benchmark (matches the LIBERO fine-tunes)', a => a.robot === 'libero'],
+        ['Custom PyBullet setups', a => a.robot !== 'libero'],
+      ];
+      for (const [label, keep] of groups) {
+        const group = document.createElement('optgroup');
+        group.label = label;
+        for (const arr of catalogData.arrangements.filter(keep)) {
+          const opt = document.createElement('option');
+          opt.value = arr.id;
+          opt.dataset.title = arr.title;
+          opt.dataset.robot = arr.robot;
+          opt.textContent = arr.title;
+          group.appendChild(opt);
+        }
+        arrSelect.appendChild(group);
       }
 
-      switchDomain('frequency_domain');
-      await onArrangementChange();
+      vlaStatus = catalogData.vla_status;
+      await switchDomain('time_domain');
       await refreshSavedRuns();
     }
 
-    function switchDomain(domain) {
+    const ROBOT_LABELS = {
+      so101: 'SO-101 (PyBullet)',
+      scara: 'SCARA (PyBullet)',
+      libero: 'LIBERO (Franka Panda, MuJoCo)',
+    };
+
+    // The checkpoint of the selected model for the current environment, if it has one.
+    function activeVariant() {
+      if (!selectedModel || !currentArrangement) return null;
+      return selectedModel.variants[currentArrangement.robot] || null;
+    }
+
+    // Mark which environments the selected model has a runnable checkpoint for.
+    function refreshArrangementOptions() {
+      for (const opt of document.querySelectorAll('#arrangement-select option')) {
+        const v = selectedModel ? selectedModel.variants[opt.dataset.robot] : null;
+        const mark = !selectedModel ? '' : v && v.available ? '✓ ' : '✕ ';
+        opt.textContent = mark + opt.dataset.title;
+      }
+    }
+
+    function prepareActiveVariant() {
+      const v = activeVariant();
+      if (!v || !v.available || v.kind !== 'vla') return;
+      fetch('/api/vla/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_id: selectedModel.id, arrangement_id: currentArrangement.id }),
+      }).then(r => r.json()).then(s => { if (!s.error) vlaStatus = s; updateModelStatus(); pollVlaStatus(); });
+    }
+
+    let vlaStatus = null;
+    let vlaPollTimer = null;
+
+    function decodersForDomain(model, domain) {
+      return model.decoders.filter(d => (catalogData.decoders[d] || {}).domain === domain);
+    }
+
+    async function switchDomain(domain) {
       currentDomain = domain;
       document.getElementById('tab-time').classList.toggle('active', domain === 'time_domain');
       document.getElementById('tab-freq').classList.toggle('active', domain === 'frequency_domain');
 
-      const models = catalogData.models[domain] || [];
+      document.getElementById('domain-hint').textContent = domain === 'time_domain'
+        ? 'Models whose action head outputs continuous actions (SO-101 joint positions, LIBERO end-effector motions). Chunks are executed as predicted.'
+        : 'Models whose action head outputs FAST tokens (DCT coefficients). The decoder inverts the coefficients the model predicted. The scripted baseline re-encodes its plan.';
+      const models = catalogData.models.filter(m => decodersForDomain(m, domain).length > 0);
       const listEl = document.getElementById('model-list');
       listEl.innerHTML = '';
+      const keepId = selectedModel ? selectedModel.id : null;
+      let selectedElem = null;
 
-      models.forEach((m, idx) => {
-        const shortName = m.name.replace(/\s*\(.*\)\s*$/, '');
+      models.forEach((m) => {
         const div = document.createElement('div');
-        div.className = 'model-item' + (idx === 0 ? ' selected' : '');
-        div.title = m.name;
-        div.onclick = () => selectModelItem(m, div);
+        div.className = m.available ? 'model-item' : 'model-item unavailable';
+        div.title = m.available ? m.name : `${m.name}: ${m.unavailable_reason}`;
+        div.onclick = () => (m.available ? selectModelItem(m, div) : openModelInfo(m, div));
+        const badgeClass = m.kind === 'vla' ? 'freq' : 'baseline';
         div.innerHTML = `
           <span class="model-radio" aria-hidden="true"></span>
           <div class="model-item-body">
-            <span class="model-name">${shortName}</span>
-            <span class="badge ${domain === 'frequency_domain' ? 'freq' : ''}" style="font-size:10.5px;padding:2px 7px;">${m.badge}</span>
+            <span class="model-name">${m.name}</span>
+            <span class="badge ${badgeClass}" style="font-size:10.5px;padding:2px 7px;">${m.badge}</span>
+            ${m.available ? '' : '<span class="model-unavailable-note">No runnable checkpoint yet · see details</span>'}
           </div>
-          <button type="button" class="model-info-btn" title="Model details" aria-label="Show details for ${shortName}">
+          <button type="button" class="model-info-btn" title="Model details" aria-label="Show details for ${m.name}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>
             </svg>
@@ -2839,38 +3279,147 @@ HTML_PAGE = """<!DOCTYPE html>
           openModelInfo(m, div);
         };
         listEl.appendChild(div);
-        if (idx === 0) {
-          selectModelItem(m, div);
-        }
+        if (m.id === keepId && m.available) selectedElem = { m, div };
       });
-
-      document.getElementById('spectral-params-row').style.opacity =
-        domain === 'frequency_domain' ? '1.0' : '0.45';
+      const firstAvailable = models.findIndex(m => m.available);
+      if (!selectedElem && firstAvailable >= 0) {
+        selectedElem = { m: models[firstAvailable], div: listEl.children[firstAvailable] };
+      }
+      if (selectedElem) await selectModelItem(selectedElem.m, selectedElem.div, selectedElem.m.id !== keepId);
     }
 
-    function selectModelItem(modelObj, elem) {
+    async function selectModelItem(modelObj, elem, loadDefaultEnv = true) {
       selectedModel = modelObj;
+      refreshArrangementOptions();
       document.querySelectorAll('.model-item').forEach(el => el.classList.remove('selected'));
       elem.classList.add('selected');
-      document.getElementById('freq-band-input').value = modelObj.freq_band || '0.0,0.35';
+
+      const select = document.getElementById('decoder-select');
+      const previous = select.value;
+      const decoders = decodersForDomain(modelObj, currentDomain);
+      select.innerHTML = '';
+      decoders.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = catalogData.decoders[d].name;
+        select.appendChild(opt);
+      });
+      select.value = decoders.includes(previous) ? previous : decoders[0];
+      select.disabled = decoders.length < 2;
+      onDecoderChange();
+
+      const arrSelect = document.getElementById('arrangement-select');
+      if (loadDefaultEnv && modelObj.default_arrangement && arrSelect.value !== modelObj.default_arrangement) {
+        arrSelect.value = modelObj.default_arrangement;
+        await onArrangementChange();
+        return;
+      }
+      if (!currentArrangement) {
+        await onArrangementChange();
+        return;
+      }
+      prepareActiveVariant();
+      updateModelStatus();
+    }
+
+    function onDecoderChange() {
+      const dec = catalogData.decoders[document.getElementById('decoder-select').value];
+      if (!dec) return;
+      document.getElementById('decoder-desc').textContent = dec.description;
+      document.getElementById('freq-band-input').value = dec.default_band;
+      document.getElementById('freq-band-input').disabled = !dec.uses_band;
+      document.getElementById('quant-scale-input').disabled = !dec.uses_quant;
+      document.getElementById('spectral-params-row').classList.toggle('disabled', !dec.uses_band && !dec.uses_quant);
+      document.getElementById('spectral-params-row').style.display = currentDomain === 'frequency_domain' ? '' : 'none';
+    }
+
+    function pollVlaStatus() {
+      if (vlaPollTimer) return;
+      vlaPollTimer = setInterval(async () => {
+        try {
+          vlaStatus = await (await fetch('/api/vla/status')).json();
+        } catch (e) { return; }
+        updateModelStatus();
+        if (vlaStatus.state !== 'loading') {
+          clearInterval(vlaPollTimer);
+          vlaPollTimer = null;
+        }
+      }, 2000);
+    }
+
+    // Returns a reason string when the current selection cannot be launched.
+    function launchBlocker() {
+      if (!selectedModel || !currentArrangement) return 'Loading…';
+      const robot = currentArrangement.robot;
+      const v = activeVariant();
+      if (!v) {
+        const options = selectedModel.robots.map(r => ROBOT_LABELS[r]).join(' or ');
+        return `${selectedModel.name} has no checkpoint for ${ROBOT_LABELS[robot]}. Pick a ✓ environment in Step 2${options ? ` (${options})` : ''} or another model.`;
+      }
+      if (!v.available) {
+        return `${v.name} cannot run on ${ROBOT_LABELS[robot]}: ${v.unavailable_reason}`;
+      }
+      if (selectedModel.kind === 'vla' && vlaStatus && ['unavailable', 'error'].includes(vlaStatus.state)) {
+        return vlaStatus.detail || 'Inference server unavailable';
+      }
+      return null;
+    }
+
+    function updateModelStatus() {
+      const el = document.getElementById('model-status');
+      const btn = document.getElementById('launch-btn');
+      if (!selectedModel) { el.innerHTML = ''; return; }
+      let state = 'ready';
+      let text;
+      const v = activeVariant();
+      if (v && v.available && v.kind === 'vla') {
+        const s = vlaStatus ? vlaStatus.state : 'loading';
+        const sameModel = vlaStatus && vlaStatus.model_id === v.id;
+        if (s === 'ready' && sameModel) {
+          text = `${v.name} loaded on the inference server (<code>${v.checkpoint}</code>). Each chunk is predicted live from the cameras, robot state, and prompt.`;
+        } else if (s === 'unavailable' || (s === 'error' && (!vlaStatus.model_id || sameModel))) {
+          state = s;
+          text = vlaStatus.detail || 'Inference server unavailable';
+        } else {
+          state = 'loading';
+          text = `Loading <code>${v.checkpoint}</code> on the inference server… Launch will wait until it is ready.`;
+        }
+      } else if (v && v.available) {
+        text = 'Scripted baseline: replays a plan computed from exact simulator state. Use it as a reference, not as a model result.';
+      } else {
+        text = '';
+      }
+      const blocker = launchBlocker();
+      if (blocker && state === 'ready') { state = 'error'; text = blocker; }
+      el.className = `model-status ${state}`;
+      el.innerHTML = `<span class="dot"></span>${text}`;
+      if (!btn.dataset.running) btn.disabled = Boolean(blocker);
+      document.getElementById('open-gui-checkbox').disabled = selectedModel.kind === 'vla' || currentArrangement.robot === 'libero';
     }
 
     function openModelInfo(modelObj, elem) {
-      const isFreq = currentDomain === 'frequency_domain';
       document.getElementById('model-info-title').textContent = modelObj.name;
       document.getElementById('model-info-subtitle').textContent =
-        isFreq ? 'Frequency-domain model' : 'Time-domain model';
+        modelObj.kind === 'vla' ? 'Vision-language-action model' : 'Scripted baseline (not a learned model)';
       document.getElementById('model-info-desc').textContent = modelObj.description;
+      const code = (v) => `<code style="font-family:'Roboto Mono',monospace;font-size:12px;">${v}</code>`;
+      const envRows = Object.entries(modelObj.variants).map(([robot, v]) => [
+        ROBOT_LABELS[robot],
+        `${v.checkpoint ? code(v.checkpoint) : v.name}<br>${v.available ? '✓ Runnable' : `✕ Not runnable: ${v.unavailable_reason}`}`
+          + (v.pretraining ? `<br><span style="color:var(--muted);">${v.pretraining}</span>` : ''),
+      ]);
       const rows = [
-        ['Version', modelObj.version],
-        ['Checkpoint', `<code style="font-family:'Roboto Mono',monospace;font-size:12px;">${modelObj.checkpoint}</code>`],
-        ['Policy', modelObj.model],
-        ['Spectrum schema', modelObj.spectrum_schema],
-        ['FAST tokenization', modelObj.fast_tokenization ? 'Enabled' : 'Disabled'],
-        ['Default freq band', modelObj.freq_band],
+        ...envRows,
+        ['Default environment', (catalogData.arrangements.find(a => a.id === modelObj.default_arrangement) || {}).title || '—'],
+        ['Parameters', modelObj.parameters],
+        ['Inputs', modelObj.inputs],
+        ['Native output', modelObj.native_output],
+        ['Time-domain decoders', decodersForDomain(modelObj, 'time_domain').map(d => catalogData.decoders[d].name).join(', ') || '—'],
+        ['Frequency-domain decoders', decodersForDomain(modelObj, 'frequency_domain').map(d => catalogData.decoders[d].name).join(', ') || '—'],
       ];
       document.getElementById('model-info-grid').innerHTML =
         rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+      document.getElementById('model-info-select-btn').style.display = modelObj.available ? '' : 'none';
       document.getElementById('model-info-select-btn').onclick = () => {
         selectModelItem(modelObj, elem);
         closeModelInfo();
@@ -2898,19 +3447,33 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('main-stage-sub').textContent = item.subtitle;
     }
 
-    async function onArrangementChange() {
+    let currentTaskId = 0;
+    let previewRequest = 0;
+
+    async function onArrangementChange(taskId = 0) {
       const arrId = document.getElementById('arrangement-select').value;
-      setServerStatus('Rendering…', true);
-      const res = await fetch(`/api/preview?arrangement_id=${encodeURIComponent(arrId)}`);
+      const request = ++previewRequest;
+      setServerStatus(arrId.startsWith('libero') ? 'Rendering MuJoCo scene…' : 'Rendering…', true);
+      const res = await fetch(`/api/preview?arrangement_id=${encodeURIComponent(arrId)}&task_id=${taskId}`);
       const data = await res.json();
+      if (request !== previewRequest) return;
+      if (data.error) {
+        setServerStatus('Ready', false);
+        alert('Environment preview failed: ' + data.error);
+        return;
+      }
       currentArrangement = data;
+      currentTaskId = data.task_id || 0;
+      const isLibero = data.robot === 'libero';
+      prepareActiveVariant();
+      updateModelStatus();
 
       document.getElementById('arrangement-desc').textContent = data.description;
       document.getElementById('preview-robot-badge').textContent = data.badge;
       document.getElementById('camera-modal-subtitle').textContent = `${data.title} — ${data.badge}`;
 
       // Build clickable view items with 2D Top-Down Schematic as the primary default view
-      const stageItems = [
+      const stageItems = isLibero ? [] : [
         {
           id: 'schematic_2d',
           shortLabel: '2D Top-View (Main)',
@@ -2930,13 +3493,15 @@ HTML_PAGE = """<!DOCTYPE html>
           shortLabel: cam.name,
           badgeText: `FOV ${cam.fov_deg}°`,
           src: b64,
-          title: `${cam.name} (Live PyBullet Render)`,
+          title: `${cam.name} (${isLibero ? 'MuJoCo render of the task start' : 'Live PyBullet Render'})`,
           subtitle: `Placement: ${eyeStr} | FOV ${cam.fov_deg}° — ${cam.role}`,
         });
       }
 
       document.getElementById('thumb-count-label').textContent =
-        `${stageItems.length} views available (2D Top-View + ${stageItems.length - 1} camera screenshots)`;
+        isLibero
+          ? `${stageItems.length} camera views of task ${currentTaskId}: ${data.task}`
+          : `${stageItems.length} views available (2D Top-View + ${stageItems.length - 1} camera screenshots)`;
 
       const thumbStrip = document.getElementById('thumb-strip');
       thumbStrip.innerHTML = '';
@@ -3013,46 +3578,55 @@ HTML_PAGE = """<!DOCTYPE html>
       const chipsEl = document.getElementById('prompt-chips');
       chipsEl.innerHTML = '';
       data.prompts.forEach((p, idx) => {
+        const active = isLibero ? p.task_id === currentTaskId : idx === 0;
         const btn = document.createElement('button');
-        btn.className = 'prompt-chip' + (idx === 0 ? ' active' : '');
+        btn.className = 'prompt-chip' + (active ? ' active' : '');
         btn.onclick = () => {
+          if (isLibero) {
+            onArrangementChange(p.task_id);
+            return;
+          }
           document.querySelectorAll('.prompt-chip').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           document.getElementById('custom-prompt-input').value = p.prompt;
         };
         btn.innerHTML = `<span>${p.prompt}</span><span class="prompt-cat">${p.category}</span>`;
         chipsEl.appendChild(btn);
-        if (idx === 0) {
+        if (active) {
           document.getElementById('custom-prompt-input').value = p.prompt;
         }
       });
 
       setServerStatus('Ready', false);
+      updateModelStatus();
     }
 
     async function launchSimulation() {
-      if (!selectedModel || !currentArrangement) return;
+      if (launchBlocker()) return;
       const btn = document.getElementById('launch-btn');
       btn.disabled = true;
-      btn.textContent = '⏳ Launching Live PyBullet Simulation & Saving Videos...';
+      btn.dataset.running = '1';
+      const variant = activeVariant();
+      btn.textContent = selectedModel.kind === 'vla'
+        ? `⏳ Running ${variant.name} closed-loop in ${ROBOT_LABELS[currentArrangement.robot]}...`
+        : '⏳ Launching Live PyBullet Simulation & Saving Videos...';
       document.getElementById('run-status-badge').textContent = 'Running Simulation...';
       setServerStatus('Running…', true);
 
       const payload = {
         arrangement_id: currentArrangement.id,
         model_id: selectedModel.id,
-        model: selectedModel.model,
-        fast_tokenization: selectedModel.fast_tokenization,
-        spectrum_schema: selectedModel.spectrum_schema,
+        decoder: document.getElementById('decoder-select').value,
         freq_band: document.getElementById('freq-band-input').value,
         quant_scale: parseFloat(document.getElementById('quant-scale-input').value || '40'),
         prompt: document.getElementById('custom-prompt-input').value,
+        task_id: currentTaskId,
         open_gui: document.getElementById('open-gui-checkbox').checked,
         hold_seconds: parseFloat(document.getElementById('hold-seconds-input').value || '6'),
       };
 
       // Immediately open the Run Modal so the user can watch the live run & results
-      openRunModalLoading(payload, selectedModel, currentArrangement);
+      openRunModalLoading(payload, variant, currentArrangement);
 
       try {
         const res = await fetch('/api/launch', {
@@ -3072,9 +3646,10 @@ HTML_PAGE = """<!DOCTYPE html>
           openRunModal(data.run);
         }
       } finally {
-        btn.disabled = false;
+        delete btn.dataset.running;
         btn.textContent = '▶ Launch Live Simulation & Compute Spectral Telemetry';
         setServerStatus('Ready', false);
+        updateModelStatus();
       }
     }
 
@@ -3198,12 +3773,15 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
                     "seed": v["seed"],
                     "badge": v["badge"],
                     "camera_count": len(v["cameras"]),
+                    "suite": v.get("suite"),
                 }
                 for k, v in ARRANGEMENT_CATALOG.items()
             ]
             self._send_json(
                 {
-                    "models": MODEL_CATALOG,
+                    "models": model_catalog(),
+                    "decoders": DECODER_CATALOG,
+                    "vla_status": _INFERENCE.status(),
                     "arrangements": arrangements_summary,
                     "gpu_status": get_gpu_hardware_status(),
                 }
@@ -3212,6 +3790,10 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/runs":
             self._send_json({"runs": list_saved_runs()})
+            return
+
+        if parsed.path == "/api/vla/status":
+            self._send_json(_INFERENCE.status())
             return
 
         if parsed.path == "/api/live/stream":
@@ -3246,8 +3828,9 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/preview":
             qs = parse_qs(parsed.query)
             arr_id = qs.get("arrangement_id", ["so101_seed_9"])[0]
+            task_id = int(qs.get("task_id", ["0"])[0])
             try:
-                preview = build_arrangement_preview(arr_id)
+                preview = build_arrangement_preview(arr_id, task_id)
                 self._send_json(preview)
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
@@ -3264,6 +3847,23 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
                 params = json.loads(raw)
                 result = execute_web_launch(params)
                 self._send_json(result)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if parsed.path == "/api/vla/prepare":
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+            try:
+                body = json.loads(raw)
+                arrangement = ARRANGEMENT_CATALOG.get(str(body.get("arrangement_id", "so101_seed_9")))
+                if arrangement is None:
+                    raise ValueError(f"Unknown arrangement {body.get('arrangement_id')!r}")
+                model = resolve_variant(str(body.get("model_id", "")), arrangement["robot"])
+                if model["kind"] != "vla":
+                    raise ValueError(f"{model['name']} does not use the inference server")
+                _INFERENCE.start(_server_spec(model))
+                self._send_json(_INFERENCE.status())
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
@@ -3286,12 +3886,18 @@ def main() -> None:
         f"Smooth Operator Web Studio listening on http://{args.host}:{args.port}",
         flush=True,
     )
+
+    def _terminate(_signum: int, _frame: Any) -> None:
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, _terminate)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         server.server_close()
+        _INFERENCE.stop()
 
 
 if __name__ == "__main__":
