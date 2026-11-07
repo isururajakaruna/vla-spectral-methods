@@ -221,6 +221,18 @@ MODEL_SPECS: list[dict[str, Any]] = [
 LIBERO_PRETRAINING = "Fine-tuned on the LIBERO benchmark (Franka Panda, all four suites)"
 LIBERO_INPUTS = "Agent-view and wrist cameras (256×256) + 8-D end-effector state"
 
+# Prompts for the single-task DWT pilots; every object named here is in the libero_object #0 scene.
+DWT_TRY_PROMPTS = [
+    {"prompt": "pick up the alphabet soup and place it in the basket", "category": "trained"},
+    {"prompt": "put the alphabet soup in the basket", "category": "paraphrase"},
+    {"prompt": "grab the soup can and drop it into the basket", "category": "paraphrase"},
+    {"prompt": "pick up the cream cheese and place it in the basket", "category": "other object"},
+    {"prompt": "pick up the milk and place it in the basket", "category": "other object"},
+    {"prompt": "pick up the tomato sauce and place it in the basket", "category": "other object"},
+    {"prompt": "pick up the butter and place it in the basket", "category": "other object"},
+    {"prompt": "pick up the alphabet soup and hold it in the air", "category": "other goal"},
+]
+
 LIBERO_SPECS: list[dict[str, Any]] = [
     {
         "id": "smolvla_libero",
@@ -329,11 +341,131 @@ LIBERO_SPECS: list[dict[str, Any]] = [
             "converted to LIBERO's 7-D controls by X-VLA's own LIBERO processor."
         ),
     },
+    {
+        "id": "starvla_qwen25_fast_libero",
+        "name": "StarVLA Qwen2.5-VL-FAST LIBERO",
+        "family": "StarVLA QwenFast (HKUST / StarVLA community, arXiv 2604.05014)",
+        "policy_type": "starvla",
+        "checkpoint": "StarVLA/Qwen2.5-VL-FAST-LIBERO-4in1",
+        "checkpoint_file": "checkpoints/steps_30000_pytorch_model.pt",
+        "base_vlm": "StarVLA/Qwen2.5-VL-3B-Instruct-Action",
+        "unnorm_key": "franka",
+        # StarVLA's LIBERO training data was rendered at 256×256 and resized to 224.
+        "libero_env": {"observation_height": 256, "observation_width": 256},
+        "parameters": "≈3.8B",
+        "badge": "Qwen VLA · LIBERO tuned · FAST DCT tokens",
+        "native_output": "dct_tokens",
+        "action_head": (
+            "Qwen2.5-VL generates FAST tokens (BPE-compressed, quantized DCT-II coefficients) as "
+            "<robot_action_k> vocabulary tokens, 8-step chunks of 7-D end-effector deltas"
+        ),
+        "inputs": "Agent-view camera only (224×224) + language prompt; no robot state",
+        "stats": "checkpoint",
+        "decoders": DCT_DECODERS,
+        "pretraining": "Qwen2.5-VL-3B with action tokens, trained 30k steps on all four LIBERO suites",
+        "description": (
+            "StarVLA's QwenFast: the VLM itself writes the action chunk as FAST tokens, with no separate "
+            "action expert. A different backbone (Qwen2.5-VL vs. PaliGemma) and input set (one camera, no "
+            "state) from π0-FAST, with the same DCT action representation. The released 30k-step "
+            "checkpoint (of a planned 80k) has no published LIBERO success rates; here it moves toward the "
+            "objects but rarely completes a grasp, and it errs at the grasp phase even on its own training "
+            "frames. Runs through StarVLA's code (third_party/starVLA)."
+        ),
+    },
+    *[
+        {
+            "id": f"pi0fast_dwt_{mode}_libero",
+            "name": f"π0-FAST + Haar DWT tokens ({mode})",
+            "family": "Ours: π0-FAST-base with wavelet action tokens (experiment/adaptive_dwt_vla)",
+            "policy_type": "adaptive_dwt",
+            "checkpoint": f"weights/lc_s2_dwt_{mode}_step_02000",
+            "wavelet": "Haar (db1), periodization",
+            "parameters": "≈3B (20.85M trained)",
+            "badge": "Ours · partially trained · Haar wavelet tokens",
+            "native_output": "dwt_tokens",
+            "action_head": head,
+            "decoders": ("dwt_native",),
+            "pretraining": (
+                "π0-FAST-base + LoRA r=16 and action-row adapters, 2,000 steps (batch 16, seed 2) on ONE task: "
+                "40 demos of 'pick up the alphabet soup and place it in the basket' (libero_object #0)"
+            ),
+            "try_prompts": DWT_TRY_PROMPTS,
+            "description": (
+                f"Our partially trained model. Each 10-step chunk is written as grammar-constrained Haar-wavelet "
+                f"tokens ({detail}), decoded by the inverse Haar DWT; the gripper is an explicit open/close event "
+                f"list. Measured on libero_object #0, init states 0–19: this checkpoint {measured}; pooled over "
+                f"3 seeds at 2k steps {pooled} (matched FAST fine-tune: 0.28). Trained on a single task, so "
+                "other prompts test how much it actually reads the instruction."
+            ),
+        }
+        for mode, head, detail, measured, pooled in (
+            ("fixed",
+             "Haar DWT tokens, fixed plan: one 8-step segment with 3 detail levels + one 2-step segment, ~69 tokens",
+             "always one 8-step segment at full resolution plus a 2-step segment",
+             "19/20", "0.88"),
+            ("adaptive",
+             "Haar DWT tokens, adaptive: the model picks segment lengths <LEN_2/4/8> and resolution <RES_k>, ~62 tokens",
+             "the model first emits a segment length and a resolution level, then only that many coarse-to-fine "
+             "coefficients",
+             "15/20", "0.65"),
+        )
+    ],
+    {
+        "id": "fafm_libero",
+        "name": "FAFM (π0) LIBERO",
+        "family": "FAFM, Frequency-Aware Flow Matching (arXiv 2606.20135)",
+        "policy_type": "pi0",
+        "checkpoint": None,
+        "parameters": "≈3B",
+        "badge": "VLA · flow matching on DCT coefficients",
+        "native_output": "dct_coeffs",
+        "action_head": (
+            "π0 action expert doing flow matching over the chunk's DCT coefficients, decoded by cosine "
+            "basis expansion, with a first-derivative (Sobolev) smoothness loss; no extra parameters"
+        ),
+        "decoders": DCT_DECODERS,
+        "pretraining": "Paper: π0 and π0.5 backbones fine-tuned on LIBERO with the FAFM objective",
+        "unavailable_reason": (
+            "No public checkpoint: the paper's anonymous code repository has expired and no weights were "
+            "released, so it has to be trained from π0 LIBERO with the FAFM objective."
+        ),
+        "description": (
+            "Replaces π0's time-domain flow matching with flow matching in DCT space, so actions are a "
+            "continuous cosine expansion that can be sampled at any rate. Reported LIBERO success on par "
+            "with π0/π0.5, with smoother motion and robustness to mechanical bias and mixed control rates."
+        ),
+    },
+    {
+        "id": "freqfm_libero",
+        "name": "FreqFM (π0) LIBERO",
+        "family": "FreqFM, Frequency-Conditioned Flow Matching (AGIBOT, arXiv 2609.10405)",
+        "policy_type": "pi0",
+        "checkpoint": None,
+        "parameters": "≈3B",
+        "badge": "VLA · frequency-conditioned flow matching",
+        "native_output": "dct_coeffs",
+        "action_head": (
+            "π0 action expert doing flow matching in DCT coordinates, from a spectrum-matched noise source "
+            "with per-frequency loss weights and per-frequency guidance limits"
+        ),
+        "decoders": DCT_DECODERS,
+        "pretraining": "Paper: π0 and π0.5 trained 20k steps on LIBERO in LeRobot (batch 64, 2× A800)",
+        "unavailable_reason": (
+            "No public checkpoint: neither code nor weights have been released, so it has to be trained "
+            "from π0 LIBERO with the FreqFM objective."
+        ),
+        "description": (
+            "Makes frequency an explicit dimension of flow matching: noise shaped like the training actions' "
+            "power spectrum, frequency-balanced training and per-frequency guidance. Reported gains on "
+            "LIBERO, LIBERO-Plus (+9.3 points) and VLA-Arena."
+        ),
+    },
 ]
 for _spec in MODEL_SPECS:
     _spec["embodiment"] = "so101"
 for _spec in LIBERO_SPECS:
-    _spec.update(embodiment="libero", inputs=LIBERO_INPUTS)
+    _spec["embodiment"] = "libero"
+    _spec.setdefault("inputs", LIBERO_INPUTS)
 MODEL_SPECS += LIBERO_SPECS
 
 # A family is one model listed in the studio, with a checkpoint per embodiment it can drive.
@@ -347,6 +479,11 @@ MODEL_FAMILIES: list[dict[str, Any]] = [
     {"id": "groot", "name": "GR00T N1.5", "variants": {"so101": "groot_n15"}},
     {"id": "wall_oss_flow", "name": "WALL-OSS", "variants": {"so101": "wall_oss_flow"}},
     {"id": "wall_oss_fast", "name": "WALL-OSS-FAST", "variants": {"so101": "wall_oss_fast"}},
+    {"id": "starvla_fast", "name": "StarVLA Qwen2.5-VL-FAST", "variants": {"libero": "starvla_qwen25_fast_libero"}},
+    {"id": "dwt_fixed", "name": "π0-FAST + Haar DWT (fixed)", "variants": {"libero": "pi0fast_dwt_fixed_libero"}},
+    {"id": "dwt_adaptive", "name": "π0-FAST + Haar DWT (adaptive)", "variants": {"libero": "pi0fast_dwt_adaptive_libero"}},
+    {"id": "fafm", "name": "FAFM", "variants": {"libero": "fafm_libero"}},
+    {"id": "freqfm", "name": "FreqFM", "variants": {"libero": "freqfm_libero"}},
 ]
 
 # Environment each embodiment opens with when a model is selected.
@@ -361,7 +498,7 @@ def get_model_spec(model_id: str) -> dict[str, Any]:
 
 
 def domain_of(spec: dict[str, Any]) -> str:
-    return "frequency_domain" if spec["native_output"] == "dct_tokens" else "time_domain"
+    return "frequency_domain" if spec["native_output"] in ("dct_tokens", "dct_coeffs", "dwt_tokens") else "time_domain"
 
 
 def finetuned_spec(base_id: str, model_id: str, name: str, checkpoint: str) -> dict[str, Any]:

@@ -1,0 +1,9 @@
+runs/
+data_cache/
+results/videos/
+results/logs/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+results/example_trajectory_*.png
+results/example_stream_*.txt

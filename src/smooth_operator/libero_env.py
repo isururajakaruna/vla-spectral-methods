@@ -148,7 +148,10 @@ class LiberoRollout:
         catalog = load_libero_tasks()[suite]
         instruction = str(request.get("instruction") or catalog["tasks"][task_id]["language"])
         max_steps = int(request.get("max_steps") or catalog["max_steps"])
-        decoder = str(request.get("decoder", "direct"))
+        decoder_label = decoder = str(request.get("decoder", "direct"))
+        # Wavelet-token models invert their own tokens inside the policy; the chunk is executed as decoded.
+        if decoder == "dwt_native":
+            decoder = "direct"
         run_dir = Path(request["run_dir"])
         run_dir.mkdir(parents=True, exist_ok=True)
         module = create_spectrum_module(
@@ -161,11 +164,17 @@ class LiberoRollout:
 
         wall_start = time.monotonic()
         self.scene.open(suite, task_id, self.policy.spec.get("libero_env"))
-        env_pre, env_post = make_env_pre_post_processors(self.scene.cfg, self.policy.config)
-        if hasattr(self.policy.model, "reset"):
-            self.policy.model.reset()
+        # Raw-observation policies (StarVLA) prepare inputs and env actions themselves.
+        raw = getattr(self.policy, "raw_observation", False)
+        if raw:
+            self.policy.reset()
+            n_exec = int(self.policy.n_action_steps)
+        else:
+            env_pre, env_post = make_env_pre_post_processors(self.scene.cfg, self.policy.config)
+            if hasattr(self.policy.model, "reset"):
+                self.policy.model.reset()
+            n_exec = int(getattr(self.policy.config, "n_action_steps", 0) or 10)
         obs, _ = self.scene.reset(init_state)
-        n_exec = int(getattr(self.policy.config, "n_action_steps", 0) or 10)
 
         frames: dict[str, list[np.ndarray]] = {cam: [] for cam in CAMERA_IDS}
         ee_samples: list[tuple[float, ...]] = []
@@ -196,11 +205,13 @@ class LiberoRollout:
 
         record(obs)
         while step < max_steps and not success:
-            batch = preprocess_observation(obs)
-            batch["task"] = [instruction]
-            batch = env_pre(batch)
             t0 = time.perf_counter()
-            actions, spectrum = self.policy.predict_frame(batch)
+            if raw:
+                actions, spectrum = self.policy.predict_raw(obs, instruction)
+            else:
+                batch = preprocess_observation(obs)
+                batch["task"] = [instruction]
+                actions, spectrum = self.policy.predict_frame(env_pre(batch))
             t1 = time.perf_counter()
             if decoder == "direct":
                 chunk = actions
@@ -213,8 +224,11 @@ class LiberoRollout:
             chunks += 1
             executed = chunk[:n_exec]
             for row in executed:
-                action = torch.as_tensor(np.asarray(row, dtype=np.float32)).unsqueeze(0)
-                action = env_post({ACTION: action})[ACTION]
+                if raw:
+                    action = self.policy.to_env_action(row)[None]
+                else:
+                    action = torch.as_tensor(np.asarray(row, dtype=np.float32)).unsqueeze(0)
+                    action = env_post({ACTION: action})[ACTION]
                 obs, _, terminated, truncated, info = self.vec_step(action)
                 step += 1
                 record(obs)
@@ -254,6 +268,8 @@ class LiberoRollout:
         metrics["max_vertical_lift_cm"] = round(float((tracks[moved][:, 2].max() - tracks[moved][0, 2]) * 100.0), 2)
         metrics["env_steps"] = step
         metrics["chunks"] = chunks
+        if hasattr(self.policy, "undecodable_chunks"):
+            metrics["undecodable_chunks"] = self.policy.undecodable_chunks
 
         xy = np.concatenate([np.asarray(ee_samples)[:, 1:3], np.asarray(object_samples)[:, 1:3]])
         lo, hi = xy.min(axis=0) - 0.05, xy.max(axis=0) + 0.05
@@ -263,7 +279,7 @@ class LiberoRollout:
             joint_samples=joint_samples,
             obstacles=[],
             metrics=metrics,
-            title=f"LIBERO {suite} #{task_id} | {request.get('model_name', '')} | {decoder} | {instruction}",
+            title=f"LIBERO {suite} #{task_id} | {request.get('model_name', '')} | {decoder_label} | {instruction}",
             workspace=(float(lo[0]), float(lo[1]), float(hi[0]), float(hi[1])),
             chunk_size=n_exec,
         )

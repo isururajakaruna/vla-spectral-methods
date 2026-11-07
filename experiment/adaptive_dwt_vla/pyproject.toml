@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_policy_adaptive_dwt"
+version = "0.1.0"
+description = "Adaptive Haar-DWT action tokenization for a pi0-FAST-style VLA (LeRobot policy plugin)"
+requires-python = ">=3.10"
+dependencies = ["numpy", "PyWavelets>=1.8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["gpu: needs CUDA + model weights", "libero: needs LIBERO simulator"]

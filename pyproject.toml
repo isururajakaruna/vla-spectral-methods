@@ -30,4 +30,4 @@ smooth-operator-compare = "smooth_operator.comparison:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-smooth_operator = ["assets/*.urdf", "assets/*.json", "assets/so101/*.urdf", "assets/so101/LICENSE", "assets/so101/assets/*.stl"]
+smooth_operator = ["assets/*.urdf", "assets/*.json", "assets/web/*", "assets/so101/*.urdf", "assets/so101/LICENSE", "assets/so101/assets/*.stl"]

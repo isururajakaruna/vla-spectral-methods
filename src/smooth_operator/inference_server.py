@@ -13,7 +13,16 @@ from .vla_models import resolve_spec
 
 def serve(spec: dict, host: str, port: int, device: str) -> None:
     try:
-        policy = LeRobotVLAPolicy(spec, device=device)
+        if spec.get("policy_type") == "starvla":
+            from .starvla_policy import StarVLAPolicy
+
+            policy = StarVLAPolicy(spec, device=device)
+        elif spec.get("policy_type") == "adaptive_dwt":
+            from .dwt_policy import AdaptiveDWTVLAPolicy
+
+            policy = AdaptiveDWTVLAPolicy(spec, device=device)
+        else:
+            policy = LeRobotVLAPolicy(spec, device=device)
     except Exception as error:
         message = gated_repo_message(error)
         if message is None:

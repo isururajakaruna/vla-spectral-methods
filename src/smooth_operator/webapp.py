@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hmac
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
+import os
 from pathlib import Path
 import shutil
 import signal
@@ -34,6 +36,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 import pybullet as p
 
+from . import devtools, experiments
 from .inference_manager import InferenceServerManager, find_vla_python
 from .inference_protocol import SocketActionChunkPolicy, request_once
 from .metrics import save_spectral_diagnostic_chart
@@ -372,6 +375,18 @@ DECODER_CATALOG: dict[str, dict[str, Any]] = {
         "uses_quant": False,
         "description": "Executes the action chunk exactly as the model predicted it, with no spectral processing.",
     },
+    "dwt_native": {
+        "id": "dwt_native",
+        "name": "Native Haar IDWT",
+        "domain": "frequency_domain",
+        "default_band": "0.0,1.0",
+        "uses_band": False,
+        "uses_quant": False,
+        "description": (
+            "Inverts the model's own Haar wavelet tokens (segment by segment, coarse-to-fine coefficients) "
+            "into the action chunk; no extra filtering."
+        ),
+    },
     "custom_hybrid": {
         "id": "custom_hybrid",
         "name": "Hybrid DCT + C1 blend (ours)",
@@ -456,6 +471,8 @@ SCRIPTED_BASELINE: dict[str, Any] = {
 NATIVE_OUTPUT_TEXT = {
     "continuous": "Continuous joint-position action chunk",
     "dct_tokens": "FAST tokens (quantized DCT-II coefficients of the action chunk)",
+    "dct_coeffs": "Continuous DCT-II coefficients of the action chunk",
+    "dwt_tokens": "Grammar-constrained Haar wavelet (DWT) coefficient tokens",
 }
 CAMERA_LABELS = {SIM_TOP: "top", SIM_WRIST: "wrist", SIM_SIDE: "side"}
 
@@ -1507,6 +1524,8 @@ HTML_PAGE = """<!DOCTYPE html>
       background: var(--panel-alt);
       white-space: nowrap;
     }
+    a.header-link { text-decoration: none; }
+    a.header-link:hover { color: var(--accent); border-color: var(--accent); }
     .header-status .dot {
       width: 7px;
       height: 7px;
@@ -2354,6 +2373,146 @@ HTML_PAGE = """<!DOCTYPE html>
       margin-bottom: 16px;
       font-size: 12.5px;
     }
+    /* Run modal fills the window: scene video + camera strip on the left, chart and stats on the right. */
+    #run-modal-backdrop {
+      padding: 12px;
+    }
+    #run-modal-backdrop .run-modal-dialog {
+      width: calc(100vw - 24px);
+      max-width: none;
+      height: calc(100vh - 24px);
+      max-height: none;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 18px;
+    }
+    #run-modal-backdrop .run-modal-dialog > .modal-header {
+      position: static;
+      margin: 0 0 10px;
+      padding: 0 0 10px;
+    }
+    .run-modal-layout {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(420px, 38%);
+      gap: 14px;
+    }
+    .run-modal-main {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+    .run-modal-main .scene-hero {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-bottom: 0;
+    }
+    .run-modal-main .scene-hero img, .run-modal-main .scene-hero video {
+      width: 100%;
+      height: 100%;
+      aspect-ratio: auto;
+    }
+    .run-modal-cams {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .run-modal-cams .multi-cam-grid {
+      height: 24vh;
+      margin-top: 0;
+      grid-template-rows: minmax(0, 1fr);
+    }
+    .run-modal-cams .multi-cam-grid.cols-1 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .run-modal-cams .cam-view-box {
+      min-height: 0;
+    }
+    .run-modal-cams .cam-view-box video {
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+      aspect-ratio: auto;
+      object-fit: contain;
+    }
+    .run-modal-cams .cam-view-caption {
+      padding: 4px 9px;
+    }
+    .run-modal-cams .cam-view-caption > span {
+      display: none;
+    }
+    /* Without a scene video (older runs), the cameras take the whole left column. */
+    .run-modal-main.no-scene .run-modal-cams {
+      flex: 1 1 auto;
+    }
+    .run-modal-main.no-scene .run-modal-cams .multi-cam-grid {
+      flex: 1;
+      height: auto;
+    }
+    .run-modal-side {
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+    }
+    .run-modal-side > * {
+      flex-shrink: 0;
+    }
+    .run-modal-side .run-meta-banner {
+      margin-bottom: 0;
+    }
+    .run-modal-side .kpi-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+      margin-bottom: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .run-modal-side .kpi-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      padding: 5px 10px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+    }
+    .run-modal-side .kpi-card:last-child {
+      border-bottom: 0;
+    }
+    .run-modal-side .kpi-label {
+      margin-bottom: 0;
+      font-size: 11.5px;
+    }
+    .run-modal-side .kpi-val {
+      font-size: 13px;
+      text-align: right;
+    }
+    @media (max-width: 1000px) {
+      #run-modal-backdrop .run-modal-dialog {
+        height: auto;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+      }
+      .run-modal-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .run-modal-main .scene-hero img, .run-modal-main .scene-hero video {
+        height: auto;
+        aspect-ratio: 16 / 9;
+      }
+      .run-modal-side {
+        overflow: visible;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2401,6 +2560,9 @@ HTML_PAGE = """<!DOCTYPE html>
       <h1>VLA & Spectral Control Studio</h1>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
+      <a class="header-status header-link" href="/terminal" target="_blank" rel="noopener" title="Shell at the project root">Terminal</a>
+      <a class="header-status header-link" href="/browse" target="_blank" rel="noopener" title="Download and upload project files">Files</a>
+      <a class="header-status header-link" href="/experiments" target="_blank" rel="noopener" title="Training progress and loss curves">Experiments</a>
       <span class="header-status" id="gpu-status-pill" title="Detecting GPU..."><span class="dot cpu"></span><span class="label">Detecting…</span></span>
       <span class="header-status" id="server-status-pill"><span class="dot"></span><span class="label" id="server-status">Ready</span></span>
     </div>
@@ -2468,6 +2630,10 @@ HTML_PAGE = """<!DOCTYPE html>
         </div>
         <label>Pre-Configured Prompts for Selected Setup (Click to Load)</label>
         <div class="prompt-chips" id="prompt-chips"></div>
+        <div id="model-prompts-block" style="display:none;">
+          <label id="model-prompts-label">Prompts to try with this model (sets the text, keeps the scene)</label>
+          <div class="prompt-chips" id="model-prompt-chips"></div>
+        </div>
 
         <label for="custom-prompt-input">Active / Custom Natural-Language Prompt</label>
         <input type="text" id="custom-prompt-input" value="Move the apple to the target" placeholder="Type any custom instruction, e.g., Place the apple to the right of the Coke can" />
@@ -2657,6 +2823,9 @@ HTML_PAGE = """<!DOCTYPE html>
         Running in PyBullet. Camera videos and stats will appear here when the run finishes.
       </div>
 
+      <div class="run-modal-layout">
+      <!-- LEFT: MAIN SCENE VIDEO WITH THE CAMERA STRIP UNDERNEATH -->
+      <div class="run-modal-main" id="run-modal-main">
       <!-- 3D SCENE VIEW: LIVE MJPEG STREAM WHILE RUNNING, RECORDED VIDEO AFTERWARDS -->
       <div class="scene-hero" id="modal-scene-section" style="display:none;">
         <img id="modal-scene-live" alt="Live 3D scene view" style="display:none;" />
@@ -2668,47 +2837,36 @@ HTML_PAGE = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- RUN METADATA BANNER (MODEL, PROMPT, TIME, ARM SETUP) -->
-      <div class="run-meta-banner" id="run-modal-meta-banner">
-        <div>
-          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Control Model & Version</div>
-          <div style="font-weight:600;color:var(--text);margin-top:2px;" id="modal-meta-model">—</div>
-          <div style="font-size:11.5px;color:#7627bb;margin-top:1px;" id="modal-meta-version">—</div>
-        </div>
-        <div>
-          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Robotic Arm Setup</div>
-          <div style="font-weight:600;color:var(--text);margin-top:2px;" id="modal-meta-arm">—</div>
-          <div style="font-size:11.5px;color:#1a73e8;margin-top:1px;" id="modal-meta-cameras">—</div>
-        </div>
-        <div>
-          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Task Prompt</div>
-          <div style="font-weight:600;color:#137333;margin-top:2px;" id="modal-meta-prompt">—</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;" id="modal-meta-schema">—</div>
-        </div>
-        <div>
-          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Timestamp & Local Folder</div>
-          <div style="font-weight:600;color:var(--text);margin-top:2px;" id="modal-meta-time">—</div>
-          <div style="font-size:11px;font-family:'Roboto Mono',monospace;color:var(--muted);margin-top:1px;" id="modal-meta-folder">—</div>
-        </div>
-      </div>
-
       <!-- MULTI-CAMERA VIDEO REPLAY ACCORDING TO NUMBER OF CAMERAS -->
-      <div id="run-modal-content-body">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div class="run-modal-cams">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
           <label style="margin:0;font-size:12.5px;color:var(--text);" id="modal-cameras-label">
             📹 Synchronized Multi-Camera Video Replay (3 Cameras)
           </label>
           <div style="display:flex;align-items:center;gap:8px;">
-            <button type="button" class="google-outline-btn" onclick="syncModalVideos('play')">▶ Play All Cameras</button>
+            <button type="button" class="google-outline-btn" onclick="syncModalVideos('play')">▶ Play All</button>
             <button type="button" class="google-outline-btn" onclick="syncModalVideos('pause')">⏸ Pause All</button>
             <button type="button" class="google-outline-btn" onclick="syncModalVideos('restart')">↺ Replay From Start</button>
           </div>
         </div>
-        <div class="multi-cam-grid cols-3" id="modal-cameras-grid" style="margin-bottom:18px;"></div>
+        <div class="multi-cam-grid cols-3" id="modal-cameras-grid"></div>
+      </div>
+      </div>
+
+      <!-- RIGHT: CHART, STATS AND RUN DETAILS (SCROLLS ON ITS OWN) -->
+      <div class="run-modal-side" id="run-modal-content-body">
+        <!-- 5-PANEL SPECTRAL DIAGNOSTIC CHART -->
+        <div class="img-frame" id="modal-chart-frame">
+          <img id="modal-chart-img" src="" alt="5-Panel Spectral Diagnostic Chart" />
+          <div class="img-caption">
+            <span>Trajectory & Power Spectral Density (PSD)</span>
+            <span id="modal-chart-caption"></span>
+          </div>
+        </div>
 
         <!-- STAT NUMBERS INSIDE MODAL -->
-        <label style="margin:0 0 8px;font-size:12.5px;color:var(--text);">📊 Run Stat Numbers & Spectral Performance Telemetry</label>
-        <div class="kpi-grid" id="modal-kpi-grid" style="grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));margin-bottom:18px;">
+        <label style="margin:0;font-size:12.5px;color:var(--text);">📊 Run Stats & Spectral Telemetry</label>
+        <div class="kpi-grid" id="modal-kpi-grid">
           <div class="kpi-card">
             <div class="kpi-label">Task Success</div>
             <div class="kpi-val" id="modal-kpi-success">—</div>
@@ -2716,10 +2874,6 @@ HTML_PAGE = """<!DOCTYPE html>
           <div class="kpi-card">
             <div class="kpi-label">3D Vertical Lift</div>
             <div class="kpi-val" id="modal-kpi-lift">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Endpoint Error</div>
-            <div class="kpi-val" id="modal-kpi-error">—</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">Joint RMS Jerk</div>
@@ -2751,19 +2905,32 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
         </div>
 
-        <!-- 5-PANEL SPECTRAL DIAGNOSTIC CHART -->
-        <div class="img-frame" id="modal-chart-frame" style="margin-top:8px;">
-          <img id="modal-chart-img" src="" alt="5-Panel Spectral Diagnostic Chart" />
-          <div class="img-caption">
-            <span>5-Panel Trajectory & Power Spectral Density (PSD) Analysis</span>
-            <span id="modal-chart-caption"></span>
-          </div>
+      <!-- RUN METADATA BANNER (MODEL, PROMPT, TIME, ARM SETUP) -->
+      <div class="run-meta-banner" id="run-modal-meta-banner">
+        <div>
+          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Control Model & Version</div>
+          <div style="font-weight:600;color:var(--text);margin-top:2px;" id="modal-meta-model">—</div>
+          <div style="font-size:11.5px;color:#7627bb;margin-top:1px;" id="modal-meta-version">—</div>
+        </div>
+        <div>
+          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Robotic Arm Setup</div>
+          <div style="font-weight:600;color:var(--text);margin-top:2px;" id="modal-meta-arm">—</div>
+          <div style="font-size:11.5px;color:#1a73e8;margin-top:1px;" id="modal-meta-cameras">—</div>
+        </div>
+        <div>
+          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Task Prompt</div>
+          <div style="font-weight:600;color:#137333;margin-top:2px;" id="modal-meta-prompt">—</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:1px;" id="modal-meta-schema">—</div>
+        </div>
+        <div>
+          <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:600;">Timestamp & Local Folder</div>
+          <div style="font-weight:600;color:var(--text);margin-top:2px;" id="modal-meta-time">—</div>
+          <div style="font-size:11px;font-family:'Roboto Mono',monospace;color:var(--muted);margin-top:1px;" id="modal-meta-folder">—</div>
         </div>
       </div>
 
-      <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <div style="font-size:11.5px;font-family:'Roboto Mono',monospace;color:var(--muted);" id="modal-cli-text"></div>
-        <button type="button" class="google-outline-btn" onclick="closeRunModal()">Close Modal</button>
+        <div style="font-size:11.5px;font-family:'Roboto Mono',monospace;color:var(--muted);word-break:break-all;" id="modal-cli-text"></div>
+      </div>
       </div>
     </div>
   </div>
@@ -2966,6 +3133,7 @@ HTML_PAGE = """<!DOCTYPE html>
       vid.removeAttribute('src');
       vid.style.display = 'none';
       section.style.display = 'block';
+      document.getElementById('run-modal-main').classList.remove('no-scene');
       waiting.style.display = 'flex';
       img.style.display = 'block';
       img.onload = () => { waiting.style.display = 'none'; };
@@ -2986,6 +3154,7 @@ HTML_PAGE = """<!DOCTYPE html>
       stopLiveSceneView();
       const section = document.getElementById('modal-scene-section');
       const vid = document.getElementById('modal-scene-video');
+      document.getElementById('run-modal-main').classList.toggle('no-scene', !run.scene_video);
       if (!run.scene_video) {
         section.style.display = 'none';
         vid.removeAttribute('src');
@@ -3319,6 +3488,7 @@ HTML_PAGE = """<!DOCTYPE html>
         return;
       }
       prepareActiveVariant();
+      renderModelPrompts();
       updateModelStatus();
     }
 
@@ -3414,6 +3584,7 @@ HTML_PAGE = """<!DOCTYPE html>
         ['Parameters', modelObj.parameters],
         ['Inputs', modelObj.inputs],
         ['Native output', modelObj.native_output],
+        ...(modelObj.wavelet ? [['Wavelet', modelObj.wavelet]] : []),
         ['Time-domain decoders', decodersForDomain(modelObj, 'time_domain').map(d => catalogData.decoders[d].name).join(', ') || '—'],
         ['Frequency-domain decoders', decodersForDomain(modelObj, 'frequency_domain').map(d => catalogData.decoders[d].name).join(', ') || '—'],
       ];
@@ -3597,8 +3768,30 @@ HTML_PAGE = """<!DOCTYPE html>
         }
       });
 
+      renderModelPrompts();
       setServerStatus('Ready', false);
       updateModelStatus();
+    }
+
+    function renderModelPrompts() {
+      const block = document.getElementById('model-prompts-block');
+      const v = activeVariant();
+      const prompts = (v && v.try_prompts) || [];
+      block.style.display = prompts.length ? '' : 'none';
+      const chipsEl = document.getElementById('model-prompt-chips');
+      chipsEl.innerHTML = '';
+      const input = document.getElementById('custom-prompt-input');
+      prompts.forEach((p) => {
+        const btn = document.createElement('button');
+        btn.className = 'prompt-chip' + (input.value === p.prompt ? ' active' : '');
+        btn.onclick = () => {
+          chipsEl.querySelectorAll('.prompt-chip').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          input.value = p.prompt;
+        };
+        btn.innerHTML = `<span>${p.prompt}</span><span class="prompt-cat">${p.category}</span>`;
+        chipsEl.appendChild(btn);
+      });
     }
 
     async function launchSimulation() {
@@ -3668,9 +3861,31 @@ HTML_PAGE = """<!DOCTYPE html>
 """
 
 
+def _basic_auth_token() -> str:
+    user = os.environ.get("SMOOTH_OPERATOR_USER", "").strip()
+    password = os.environ.get("SMOOTH_OPERATOR_PASSWORD", "")
+    if not user or not password:
+        raise SystemExit("Set SMOOTH_OPERATOR_USER and SMOOTH_OPERATOR_PASSWORD: every route requires HTTP Basic auth.")
+    return base64.b64encode(f"{user}:{password}".encode()).decode("ascii")
+
+
 class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         return
+
+    def _authorized(self) -> bool:
+        """Require HTTP Basic credentials on every route; send the 401 challenge otherwise."""
+        scheme, _, token = self.headers.get("Authorization", "").partition(" ")
+        if scheme.lower() == "basic" and hmac.compare_digest(token.strip().encode(), self.server.basic_auth_token.encode()):
+            return True
+        body = b'{"error": "Authentication required"}'
+        self.send_response(HTTPStatus.UNAUTHORIZED)
+        self.send_header("WWW-Authenticate", 'Basic realm="Smooth Operator Studio", charset="UTF-8"')
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        return False
 
     def _send_json(self, data: Any, status: int = HTTPStatus.OK) -> None:
         body = json.dumps(data).encode("utf-8")
@@ -3753,8 +3968,110 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _send_html(self, html: str) -> None:
+        body = html.encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _devtools_get(self, parsed: Any) -> bool:
+        """Serve /terminal, /browse and their APIs; return False for other paths."""
+        path = parsed.path
+        if path.startswith("/static/"):
+            asset = devtools.static_asset(path[len("/static/") :])
+            if asset is None:
+                self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
+            else:
+                self._send_file(*asset)
+            return True
+        if path not in ("/terminal", "/browse", "/api/terminal/stream", "/api/files/list", "/api/files/download"):
+            return False
+        refusal = devtools.request_allowed(self, is_post=False)
+        if refusal:
+            self._send_json({"error": refusal}, status=HTTPStatus.FORBIDDEN)
+            return True
+        qs = parse_qs(parsed.query)
+        try:
+            if path == "/terminal":
+                self._send_html(devtools.render_page(devtools.TERMINAL_PAGE, "terminal"))
+            elif path == "/browse":
+                self._send_html(devtools.render_page(devtools.BROWSE_PAGE, "browse"))
+            elif path == "/api/terminal/stream":
+                devtools.stream_terminal(self, int(self.headers.get("Last-Event-ID") or 0))
+            elif path == "/api/files/list":
+                self._send_json(devtools.list_directory(qs.get("path", [""])[0]))
+            else:
+                devtools.send_download(self, qs.get("path", [""])[0])
+        except devtools.FileError as exc:
+            self._send_json({"error": str(exc)}, status=exc.status)
+        return True
+
+    def _experiments_get(self, parsed: Any) -> bool:
+        """Serve the read-only training dashboard; return False for other paths."""
+        path = parsed.path
+        if path == "/experiments":
+            self._send_html(devtools.render_page(experiments.EXPERIMENTS_PAGE, "experiments"))
+        elif path == "/api/experiments/runs":
+            self._send_json(experiments.list_runs())
+        elif path == "/api/experiments/metrics":
+            data = experiments.run_metrics(parse_qs(parsed.query).get("run", [""])[0])
+            if data is None:
+                self._send_json({"error": "Run not found"}, status=HTTPStatus.NOT_FOUND)
+            else:
+                self._send_json(data)
+        elif path == "/api/experiments/results":
+            self._send_json(experiments.results_summary())
+        elif path.startswith("/api/experiments/results/"):
+            asset = experiments.result_file(path[len("/api/experiments/results/") :])
+            if asset is None:
+                self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
+            else:
+                self._send_file(*asset)
+        else:
+            return False
+        return True
+
+    def _devtools_post(self, parsed: Any) -> bool:
+        path = parsed.path
+        if path not in ("/api/terminal/input", "/api/terminal/resize", "/api/files/mkdir", "/api/files/upload"):
+            return False
+        refusal = devtools.request_allowed(self, is_post=True)
+        if refusal:
+            self._send_json({"error": refusal}, status=HTTPStatus.FORBIDDEN)
+            return True
+        qs = parse_qs(parsed.query)
+        try:
+            if path == "/api/files/upload":
+                result = devtools.receive_upload(self, qs.get("dir", [""])[0], qs.get("name", [""])[0])
+            else:
+                raw = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                if path == "/api/terminal/input":
+                    devtools.TERMINAL.write(raw)
+                    result = {"ok": True}
+                elif path == "/api/terminal/resize":
+                    size = json.loads(raw or b"{}")
+                    devtools.TERMINAL.resize(int(size["cols"]), int(size["rows"]))
+                    result = {"ok": True}
+                else:
+                    body = json.loads(raw or b"{}")
+                    result = devtools.make_folder(str(body.get("dir", "")), str(body.get("name", "")))
+            self._send_json(result)
+        except devtools.FileError as exc:
+            self._send_json({"error": str(exc)}, status=exc.status)
+        except (ValueError, KeyError) as exc:
+            self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+        return True
+
     def do_GET(self) -> None:
+        if not self._authorized():
+            return
         parsed = urlparse(self.path)
+        if self._devtools_get(parsed):
+            return
+        if self._experiments_get(parsed):
+            return
         if parsed.path == "/":
             body = HTML_PAGE.encode("utf-8")
             self.send_response(HTTPStatus.OK)
@@ -3839,7 +4156,11 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
         self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
+        if not self._authorized():
+            return
         parsed = urlparse(self.path)
+        if self._devtools_post(parsed):
+            return
         if parsed.path == "/api/launch":
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
@@ -3873,15 +4194,34 @@ class SmoothOperatorWebHandler(BaseHTTPRequestHandler):
 
 class SmoothOperatorHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
+    basic_auth_token = ""
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument(
+        "--allow-remote-tools",
+        action="store_true",
+        help="Serve /terminal and /browse even when --host is not a loopback address (anyone who "
+        "can reach the port gets a shell)",
+    )
+    parser.add_argument(
+        "--allowed-host",
+        action="append",
+        default=[],
+        metavar="HOSTNAME",
+        help="Public hostname a tunnel or proxy forwards to this server (e.g. an ngrok domain), "
+        "trusted by /terminal and /browse; repeatable",
+    )
     args = parser.parse_args()
+    auth_token = _basic_auth_token()
 
     server = SmoothOperatorHTTPServer((args.host, args.port), SmoothOperatorWebHandler)
+    server.basic_auth_token = auth_token
+    server.allow_remote_tools = args.allow_remote_tools
+    server.allowed_hosts = {h.strip().lower() for h in args.allowed_host if h.strip()}
     print(
         f"Smooth Operator Web Studio listening on http://{args.host}:{args.port}",
         flush=True,
@@ -3897,6 +4237,7 @@ def main() -> None:
         pass
     finally:
         server.server_close()
+        devtools.TERMINAL.stop()
         _INFERENCE.stop()
 
 
