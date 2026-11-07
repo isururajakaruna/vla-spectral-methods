@@ -16,7 +16,7 @@ img{max-width:100%;display:block;margin:.6rem 0 1rem}
 td.num{text-align:right;font-variant-numeric:tabular-nums}
 </style></head><body>
 <h1>Adaptive DWT action tokens vs FAST on π₀-FAST: LoRA training report</h1>
-<p class='sub'>Generated 2026-11-07 20:53 by <code>scripts/write_training_report.py</code> from measured run logs and evaluation files. Every number below is measured on the listed hardware unless explicitly marked otherwise. No dataset content is included.</p>
+<p class='sub'>Generated 2026-11-07 21:59 by <code>scripts/write_training_report.py</code> from measured run logs and evaluation files. Every number below is measured on the listed hardware unless explicitly marked otherwise. No dataset content is included.</p>
 <div class='kpis'>
 <div class='kpi'><span>FAST (DCT + BPE) @ 2000 steps</span><b style='color:#d9534f'>17/60 = 0.28</b><span>95% CI [0.19, 0.41], 3 seeds × 20 episodes</span></div>
 <div class='kpi'><span>DWT fixed plan @ 2000 steps</span><b style='color:#2a7ab9'>53/60 = 0.88</b><span>95% CI [0.78, 0.94], 3 seeds × 20 episodes</span></div>
@@ -142,14 +142,27 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 <p>Load one for inference:</p><pre>from lerobot_policy_adaptive_dwt.modeling_adaptive_dwt import load_checkpoint
 policy, meta = load_checkpoint("experiment/adaptive_dwt_vla/weights/lc_s2_dwt_fixed_step_02000")</pre>
 <p>The web studio exposes <code>lc_s2_dwt_fixed_step_02000</code> and <code>lc_s2_dwt_adaptive_step_02000</code> as “π₀-FAST + DWT (fixed / adaptive)”.</p>
-<h2>7. Caveats</h2><ul>
+<h2>7. Wavelet choice (offline selection test)</h2>
+<p>All trained models use Haar (db1). An offline test compared 26 transforms (20 standard wavelets and mixed transforms that use a different wavelet at each level, each in periodization and symmetric mode) by the coefficient tokens needed to match FAST's reconstruction accuracy on held-out windows. Top 6 plus common wavelets for reference; full results, rate–distortion curves and basis-shape plots in <a href='wavelet_selection.html'>wavelet_selection.html</a>.</p>
+<table class=""><thead><tr><th>rank</th><th>transform</th><th>H10 mode</th><th>H10 tokens @FAST</th><th>H10 vs Haar</th><th>H10 jerk ratio</th><th>H32 mode</th><th>H32 tokens @FAST</th><th>H32 vs Haar</th><th>H32 jerk ratio</th></tr></thead><tbody>
+<tr><td>1</td><td><code>mix:sym4→haar</code></td><td>symmetric</td><td>60.5</td><td>+0.4%</td><td>0.87</td><td>symmetric</td><td>157.7</td><td>-5.4%</td><td>0.80</td></tr>
+<tr><td>2</td><td><code>mix:haar,haar→bior4.4</code></td><td>periodization</td><td>60.3</td><td>-0.0%</td><td>1.28</td><td>periodization</td><td>166.0</td><td>-0.4%</td><td>1.31</td></tr>
+<tr><td>3</td><td><code>haar</code></td><td>periodization</td><td>60.3</td><td>+0.0%</td><td>1.28</td><td>periodization</td><td>166.7</td><td>+0.0%</td><td>1.30</td></tr>
+<tr><td>4</td><td><code>mix:haar→bior2.2</code></td><td>periodization</td><td>60.4</td><td>+0.3%</td><td>1.29</td><td>periodization</td><td>166.3</td><td>-0.2%</td><td>1.31</td></tr>
+<tr><td>5</td><td><code>mix:haar→db2→db4</code></td><td>periodization</td><td>60.4</td><td>+0.3%</td><td>1.29</td><td>periodization</td><td>166.8</td><td>+0.1%</td><td>1.32</td></tr>
+<tr><td>6</td><td><code>bior1.3</code></td><td>periodization</td><td>60.5</td><td>+0.4%</td><td>1.29</td><td>periodization</td><td>168.2</td><td>+0.9%</td><td>1.30</td></tr>
+<tr><td>9</td><td><code>db4</code></td><td>periodization</td><td>62.8</td><td>+4.2%</td><td>1.06</td><td>periodization</td><td>172.2</td><td>+3.3%</td><td>1.01</td></tr>
+<tr><td>20</td><td><code>sym4</code></td><td>periodization</td><td>65.7</td><td>+9.0%</td><td>1.02</td><td>periodization</td><td>179.3</td><td>+7.6%</td><td>1.04</td></tr>
+<tr><td>10</td><td><code>bior4.4</code></td><td>periodization</td><td>64.3</td><td>+6.6%</td><td>1.01</td><td>periodization</td><td>176.8</td><td>+6.0%</td><td>1.02</td></tr></tbody></table>
+<p>Token counts here exclude gripper and structure tokens and use whole-window transforms, so they are not the deployed codec's counts. This measures how compactly each transform represents the motion, not how well a policy learns its tokens; none of the alternatives has been trained.</p>
+<h2>8. Caveats</h2><ul>
 <li>One task and one instruction. Nothing here says how the tokenizers behave in multi-task training or on other robots.</li>
 <li>20 episodes per checkpoint and 3 seeds: confidence intervals are wide, and the paired tests are not corrected for multiple comparisons.</li>
 <li>The FAST baseline learns LIBERO FAST tokens through the same small LoRA budget. Its low value-token accuracy and malformed streams suggest part of the gap is how hard BPE tokens are to adapt under this recipe; the fully fine-tuned reference shows FAST itself can solve the task.</li>
 <li>Training is not bit-reproducible: rerunning seed 0 did not exactly reproduce the pilot because of nondeterministic GPU kernels.</li>
 <li>Models are LoRA fine-tunes, not full fine-tunes; the base model stays frozen.</li>
 </ul>
-<h2>8. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla
+<h2>9. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla
 PY=~/miniconda3/envs/smooth-operator-vla/bin/python
 $PY scripts/prepare_libero.py                 # index + train/val split (downloads lerobot/libero)
 bash scripts/run_learning_curve.sh 0 1 2      # 9 runs × 2000 steps + checkpoint evals (≈24 h on one A6000)

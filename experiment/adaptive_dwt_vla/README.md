@@ -54,6 +54,7 @@ $PY -m pytest -q -m gpu                     # 4 passed; needs ~15 GB free VRAM (
 $PY scripts/prepare_libero.py               # data_cache/libero_index.npz + splits.json
 $PY scripts/evaluate_codec.py               # Stage A, H=10 and H=32
 $PY scripts/write_reports.py codec          # results/offline_codec_report.md
+$PY scripts/wavelet_selection.py            # 26 transforms x 2 modes x H=10/32, CPU ~1 min -> ../reports/wavelet_selection.html
 
 # Stage B: tiny overfit (64 windows, 300 steps; 1.65 s/step, 41.2 GB reserved, ~9 min)
 $PY scripts/train.py --variant dwt_adaptive --name overfit_dwt_adaptive --overfit 64 --steps 300 \
@@ -109,8 +110,9 @@ run (step 5000): `adapters.safetensors` (LoRA + action-row adapters, Git LFS) an
 base-model revision). Run `git lfs install && git lfs pull` after cloning, then load with
 `load_checkpoint("weights/lc_s2_dwt_fixed_step_02000")`; the frozen base model comes from Hugging Face.
 
-`results/training_report.html` is a self-contained report (setup, compute, curves, closed-loop success, released
-weights), rebuilt from `runs/` and `results/` by `python scripts/write_training_report.py`. `runs/`, `data_cache/`,
+`../reports/training_report.html` is a self-contained report (setup, compute, curves, closed-loop success, released
+weights, wavelet choice), rebuilt from `runs/` and `results/` by `python scripts/write_training_report.py`;
+`../reports/wavelet_selection.html` (offline comparison of 26 wavelet transforms) by `python scripts/wavelet_selection.py`. `runs/`, `data_cache/`,
 rollout videos, logs and dataset-derived example plots are not committed.
 
 ## Known limitations

@@ -1,4 +1,4 @@
-"""Self-contained HTML training report (results/training_report.html) built only from measured files:
+"""Self-contained HTML training report (experiment/reports/training_report.html) built only from measured files:
 runs/*/{config,status,metrics}, results/eval*, results/codec_choice_H10.json and weights/*.
 
 No dataset content (frames, actions, episode ids, rollout videos) is embedded.
@@ -26,6 +26,7 @@ import numpy as np  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "results"
 WEIGHTS = ROOT / "weights"
+REPORTS = ROOT.parent / "reports"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -427,8 +428,39 @@ def main() -> None:
         "policy, meta = load_checkpoint(\"experiment/adaptive_dwt_vla/weights/lc_s2_dwt_fixed_step_02000\")</pre>")
     add("<p>The web studio exposes <code>lc_s2_dwt_fixed_step_02000</code> and <code>lc_s2_dwt_adaptive_step_02000</code> as “π₀-FAST + DWT (fixed / adaptive)”.</p>")
 
+    # ---- wavelet choice
+    ws = RES / "wavelet_selection.json"
+    if ws.exists():
+        wrows = json.loads(ws.read_text())["rows"]
+        hzs = sorted({r["horizon"] for r in wrows})
+        best = {}
+        for r in wrows:
+            k = (r["name"], r["horizon"])
+            if k not in best or r["score"] < best[k]["score"]:
+                best[k] = r
+        names = sorted({r["name"] for r in wrows}, key=lambda n: np.mean([best[(n, hz)]["score"] for hz in hzs]))
+        show = names[:6] + [n for n in ("haar", "db4", "sym4", "bior4.4") if n not in names[:6]]
+        body = []
+        for n in show:
+            cells = [f"{names.index(n) + 1}", f"<code>{esc(n)}</code>"]
+            for hz in hzs:
+                b = best[(n, hz)]
+                cells += [esc(b["mode"]), num(b["tokens_adaptive@fast"], 1),
+                          "–" if not np.isfinite(b["score"]) else f"{100 * (b['score'] - 1):+.1f}%",
+                          "–" if "op_jerk_ratio" not in b else f"{b['op_jerk_ratio']:.2f}"]
+            body.append(cells)
+        hdr = ["rank", "transform"] + [c for hz in hzs for c in (f"H{hz} mode", f"H{hz} tokens @FAST", f"H{hz} vs Haar", f"H{hz} jerk ratio")]
+        add("<h2>7. Wavelet choice (offline selection test)</h2>")
+        add(f"<p>All trained models use Haar (db1). An offline test compared {len(names)} transforms (20 standard wavelets and mixed transforms that use a different wavelet "
+            "at each level, each in periodization and symmetric mode) by the coefficient tokens needed to match FAST's reconstruction accuracy on held-out windows. "
+            "Top 6 plus common wavelets for reference; full results, rate–distortion curves and basis-shape plots in "
+            "<a href='wavelet_selection.html'>wavelet_selection.html</a>.</p>")
+        add(table(hdr, body))
+        add("<p>Token counts here exclude gripper and structure tokens and use whole-window transforms, so they are not the deployed codec's counts. "
+            "This measures how compactly each transform represents the motion, not how well a policy learns its tokens; none of the alternatives has been trained.</p>")
+
     # ---- caveats
-    add("<h2>7. Caveats</h2><ul>")
+    add("<h2>8. Caveats</h2><ul>")
     for c in [
         "One task and one instruction. Nothing here says how the tokenizers behave in multi-task training or on other robots.",
         "20 episodes per checkpoint and 3 seeds: confidence intervals are wide, and the paired tests are not corrected for multiple comparisons.",
@@ -440,14 +472,15 @@ def main() -> None:
         add(f"<li>{esc(c)}</li>")
     add("</ul>")
 
-    add("<h2>8. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla\n"
+    add("<h2>9. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla\n"
         "PY=~/miniconda3/envs/smooth-operator-vla/bin/python\n"
         "$PY scripts/prepare_libero.py                 # index + train/val split (downloads lerobot/libero)\n"
         "bash scripts/run_learning_curve.sh 0 1 2      # 9 runs × 2000 steps + checkpoint evals (≈24 h on one A6000)\n"
         "$PY scripts/write_reports.py codec summary\n"
         "$PY scripts/write_training_report.py          # this file</pre>")
     add("</body></html>")
-    out = RES / "training_report.html"
+    REPORTS.mkdir(exist_ok=True)
+    out = REPORTS / "training_report.html"
     out.write_text("\n".join(h))
     print("wrote", out, f"{out.stat().st_size / 1e6:.1f} MB")
 
