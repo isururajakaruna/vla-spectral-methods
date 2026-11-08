@@ -1,0 +1,51 @@
+{
+ "task": 24,
+ "horizon": 10,
+ "gamma": 0.005,
+ "rows": [
+  {
+   "codec": "haar",
+   "mode": "fixed",
+   "val_windows": 631,
+   "tokens": 69.12678288431061,
+   "tokens_bpe": 53.04754358161648,
+   "merged_tokens": 722,
+   "val_mse": 0.0012827640007621471,
+   "val_mse_median_window": 8.125091517682855e-05,
+   "jerk_ratio": 1.028207076438635
+  },
+  {
+   "codec": "haar",
+   "mode": "adaptive",
+   "val_windows": 631,
+   "tokens": 61.61331220285261,
+   "tokens_bpe": 50.5229793977813,
+   "merged_tokens": 722,
+   "val_mse": 0.0006729378950299169,
+   "val_mse_median_window": 0.00010754541192166362,
+   "jerk_ratio": 1.056252158487497
+  },
+  {
+   "codec": "mix:sym4\u2192haar",
+   "mode": "fixed",
+   "val_windows": 631,
+   "tokens": 100.14263074484944,
+   "tokens_bpe": 69.76703645007925,
+   "merged_tokens": 722,
+   "val_mse": 0.0016844997585077019,
+   "val_mse_median_window": 9.843198635385559e-05,
+   "jerk_ratio": 1.0058603881031913
+  },
+  {
+   "codec": "mix:sym4\u2192haar",
+   "mode": "adaptive",
+   "val_windows": 631,
+   "tokens": 75.57210776545166,
+   "tokens_bpe": 56.597464342313785,
+   "merged_tokens": 722,
+   "val_mse": 0.0020846901691508597,
+   "val_mse_median_window": 0.00024862381605025375,
+   "jerk_ratio": 0.935415408331718
+  }
+ ]
+}

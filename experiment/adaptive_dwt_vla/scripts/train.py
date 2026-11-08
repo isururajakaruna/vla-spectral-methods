@@ -1,6 +1,9 @@
 """Fine-tune lerobot/pi0fast-base with LoRA + action-row adapters on LIBERO.
 
-Variants: fast_matched (FAST libero tokenizer), dwt_fixed, dwt_adaptive. Same data, images, state,
+Variants: fast_matched (FAST libero tokenizer), dwt_fixed, dwt_adaptive, dwt_{fixed,adaptive}_bpe (BPE over the coefficients of the fixed / oracle plans),
+dwt_{fixed,adaptive}_s4h[_bpe] (whole-window sym4→haar DWT, symmetric mode; fixed = full depth, adaptive = per-chunk depth),
+dwt_fixed_compact[_bpe] (fixed plan without per-segment structure tokens; see --detail-scale/--deadzone),
+dct_fixed (whole-chunk DCT-II, full resolution, same quantizer/grammar as DWT, no BPE). Same data, images, state,
 prompt, normalization (training-split stats), horizon, optimizer schedule and effective batch.
 
 Run directory runs/<name>/:
@@ -32,16 +35,21 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from lerobot_policy_adaptive_dwt.codec import AdaptiveDWTCodec, CodecSpec  # noqa: E402
+from lerobot_policy_adaptive_dwt.codec_compact import CompactDWTCodec  # noqa: E402
+from lerobot_policy_adaptive_dwt.codec_window import WindowDWTCodec, dct_bands  # noqa: E402
 from lerobot_policy_adaptive_dwt.data import load_index, norm_stats, split_episodes, window_starts, windows  # noqa: E402
 
 REPO = "lerobot/libero"
 REVISION = "a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4"
 LENGTHS = {10: (2, 4, 8), 32: (4, 8, 16, 32)}
+WINDOW_LEVELS = {10: 3, 32: 4}
 
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--variant", required=True, choices=["fast_matched", "dwt_fixed", "dwt_adaptive"])
+    ap.add_argument("--variant", required=True, choices=["fast_matched", "dwt_fixed", "dwt_adaptive", "dwt_fixed_bpe", "dwt_adaptive_bpe", "dwt_fixed_s4h", "dwt_adaptive_s4h",
+                                                       "dwt_fixed_s4h_bpe", "dwt_adaptive_s4h_bpe",
+                                                       "dwt_fixed_compact", "dwt_fixed_compact_bpe", "dct_fixed"])
     ap.add_argument("--name", required=True)
     ap.add_argument("--tasks", type=int, nargs="+", default=[24])
     ap.add_argument("--horizon", type=int, default=10)
@@ -53,6 +61,9 @@ def parse_args():
     ap.add_argument("--lora-rank", type=int, default=16)
     ap.add_argument("--lora-alpha", type=float, default=16.0)
     ap.add_argument("--max-action-tokens", type=int, default=96)
+    ap.add_argument("--detail-scale", type=float, default=1.0, help="multiply Haar detail quantization steps (1 = plain)")
+    ap.add_argument("--detail-scheme", choices=["uniform", "fine"], default="uniform", help="fine: finest details coarsest")
+    ap.add_argument("--deadzone", type=float, default=0.0, help="extra zero band for detail coefficients, in steps")
     ap.add_argument("--grad-ckpt", action="store_true", help="gradient checkpointing (less VRAM, ~25%% slower)")
     ap.add_argument("--empty-cameras", type=int, default=0)
     ap.add_argument("--log-every", type=int, default=10)
@@ -154,9 +165,34 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
     codec = None
     if args.variant != "fast_matched":
         cal = windows(idx, window_starts(idx, train_eps, H, stride=1), H, stats)
-        codec = AdaptiveDWTCodec.fit(spec, cal)
+        if args.variant == "dct_fixed":
+            codec = WindowDWTCodec.fit(spec, cal, ["dct"], "orthonormal", levels=len(dct_bands(H)) - 1)
+            args.max_action_tokens = max(args.max_action_tokens, codec.max_stream_tokens + 8)
+        elif "_s4h" in args.variant:
+            codec = WindowDWTCodec.fit(spec, cal, ["sym4", "haar"], "symmetric", levels=WINDOW_LEVELS[H])
+            args.max_action_tokens = max(args.max_action_tokens, codec.max_stream_tokens + 8)
+        else:
+            qkw = dict(detail_scale=args.detail_scale, detail_scheme=args.detail_scheme, deadzone=args.deadzone)
+            codec = AdaptiveDWTCodec.fit(spec, cal, **qkw)
+            if "_compact" in args.variant:
+                codec = CompactDWTCodec(codec, choice["fixed"]["plan"])
     gamma = choice["adaptive"]["weights"]["gamma"]
-    fixed_plan = [list(p) for p in choice["fixed"]["plan"]] if args.variant == "dwt_fixed" else []
+    fixed_plan = []
+    if args.variant.startswith(("dwt_fixed", "dct_fixed")):
+        fixed_plan = [list(p) for p in (codec.full_plan() if hasattr(codec, "full_plan") else choice["fixed"]["plan"])]
+    bpe_stats = None
+    if args.variant.endswith("_bpe"):
+        from lerobot_policy_adaptive_dwt.bpe import BPEDWTCodec
+        from lerobot_policy_adaptive_dwt.oracle_dp import OracleWeights, solve
+
+        w = OracleWeights(gamma=gamma)
+        plans = [[tuple(p) for p in fixed_plan]] * len(cal) if fixed_plan else [solve(codec, x, w)[0] for x in cal]
+        base_len = [len(codec.encode_plan(x, p)[0]) for x, p in zip(cal, plans)]
+        codec = BPEDWTCodec.fit(codec, cal, plans)
+        bpe_len = [len(codec.encode_plan(x, p)[0]) for x, p in zip(cal, plans)]
+        bpe_stats = {"local_tokens": codec.n_local, "merged_tokens": len(codec.expansion),
+                     "train_tokens_mean_before": float(np.mean(base_len)), "train_tokens_mean_after": float(np.mean(bpe_len))}
+        print(f"BPE: {bpe_stats}", flush=True)
     # safe fallback = zero end-effector delta, gripper open (-1), in normalized units
     fallback = np.concatenate([(0 - a_mean[:6]) / a_std[:6], [(-1 - a_mean[6]) / a_std[6]]])
 
@@ -240,7 +276,7 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
     run_cfg = {
         "args": vars(args), "train_episodes": train_eps, "val_episodes": val_eps, "n_train_windows": len(train_ds),
         "n_val_windows": len(val_ds), "instructions": {t: splits["tasks"][str(t)]["instruction"] for t in args.tasks},
-        "counts": counts, "model_load_s": t_load, "git": git_rev(), "gpu": torch.cuda.get_device_name(0),
+        "counts": counts, "bpe": bpe_stats, "model_load_s": t_load, "git": git_rev(), "gpu": torch.cuda.get_device_name(0),
         "versions": {"python": platform.python_version(), "torch": torch.__version__, "lerobot": lerobot.__version__,
                      "transformers": transformers.__version__},
         "effective_batch": args.micro_batch * args.grad_accum, **{k: meta_base[k] for k in ("base_checkpoint", "dataset", "oracle_gamma", "fixed_plan")},

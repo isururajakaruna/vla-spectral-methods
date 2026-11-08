@@ -92,6 +92,8 @@ def solve_parts(parts: Parts, horizon: int, lengths: tuple[int, ...], w: OracleW
 
 
 def solve(codec: AdaptiveDWTCodec, window: np.ndarray, w: OracleWeights) -> tuple[Plan, float]:
+    if hasattr(codec, "solve"):  # whole-window and BPE codecs
+        return codec.solve(window, w)
     return solve_parts(candidate_parts(codec, window), codec.spec.horizon, tuple(codec.spec.lengths), w)
 
 

@@ -27,6 +27,7 @@ from lerobot.utils.constants import ACTION_TOKEN_MASK, ACTION_TOKENS, OBS_LANGUA
 from safetensors.torch import load_file, save_file
 
 from .adapters import adapter_state_dict, attach_adapters, load_adapter_state_dict
+from .bpe import load_codec
 from .codec import AdaptiveDWTCodec
 from .configuration_adaptive_dwt import AdaptiveDWTConfig
 from .processor_adaptive_dwt import ACTION_PREFIX_TEXT, local_to_pali, pali_to_local
@@ -81,6 +82,7 @@ def classify_targets(targets: torch.Tensor, variant: str, codec: AdaptiveDWTCode
     in_range = (local >= 0) & (local < v.size)
     cls = np.full(local.shape, "", dtype=object)
     cls[in_range] = np.vectorize(v.token_class)(local[in_range]) if in_range.any() else []
+    cls[(local >= v.size) & (local < getattr(codec, "n_local", v.size))] = "coef"  # merged BPE coefficient tokens
     for name in ("len", "res", "coef", "grip", "eos"):
         classes[name] = torch.from_numpy(cls == name).to(t.device)
     return classes
@@ -210,9 +212,7 @@ class AdaptiveDWTPolicy(PI0FastPolicy):
             t0 = time.perf_counter()
             try:
                 acts = self.codec.decode(local)
-                from .token_grammar import parse
-
-                segs = parse(local, self.codec.vocab, horizon, tuple(self.codec.spec.lengths), self.codec.spec.n_cont)
+                segs = self.codec.segments(local)
                 info.update(valid=True, plan=[[s.length, s.res] for s in segs])
             except GrammarError as e:
                 logging.warning("invalid DWT stream, using safe fallback: %s", e)
@@ -258,7 +258,7 @@ def make_config(variant: str, horizon: int, max_action_tokens: int, device: str 
         max_decoding_steps=max_action_tokens, action_tokenizer_name="jadechoghari/tokenizer-lib-mean",
         empty_cameras=empty_cameras, device=device, dtype="bfloat16",
         gradient_checkpointing=kw.pop("gradient_checkpointing", True),
-        dwt_mode="fixed" if variant == "dwt_fixed" else "adaptive", **kw,
+        dwt_mode="fixed" if variant.startswith(("dwt_fixed", "dct_fixed")) else "adaptive", **kw,
     )
     cfg.input_features = {
         "observation.images.image": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 256, 256)),
@@ -278,7 +278,7 @@ def action_token_ids(variant: str, codec: AdaptiveDWTCodec | None, policy) -> li
     if variant == "fast_matched":
         n = policy.action_tokenizer.vocab_size
         return [int(i) for i in local_to_pali(np.arange(n))] + special
-    return [int(i) for i in local_to_pali(np.arange(codec.vocab.size))]
+    return [int(i) for i in local_to_pali(np.arange(getattr(codec, "n_local", codec.vocab.size)))]
 
 
 def build_policy(variant: str, cfg: AdaptiveDWTConfig, codec: AdaptiveDWTCodec | None, fallback: np.ndarray,
@@ -315,7 +315,7 @@ def save_checkpoint(policy, path: Path, meta: dict, optimizer=None, min_free_gb:
 def load_checkpoint(path: Path, device: str = "cuda"):
     meta = json.loads((Path(path) / "meta.json").read_text())
     variant = meta["variant"]
-    codec = AdaptiveDWTCodec.from_dict(meta["codec"]) if meta.get("codec") else None
+    codec = load_codec(meta["codec"]) if meta.get("codec") else None
     cfg = make_config(variant, meta["horizon"], meta["max_action_tokens"], device=device,
                       empty_cameras=meta.get("empty_cameras", 0),
                       gradient_checkpointing=False, fixed_plan=meta.get("fixed_plan") or [],

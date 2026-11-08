@@ -256,16 +256,57 @@ def build_nodes():
              "Haar's 8+2 segmentation suits 10 steps, while sym4→haar needs symmetric padding (16 coefficients per dimension instead of 10). "
              "Its only advantage is smoother output. Not trained; revisit with 32-step chunks.",
              short=f"Haar wins: {r[('haar', 'adaptive')]['tokens_bpe']:.1f} vs {r[('mix:sym4→haar', 'adaptive')]['tokens_bpe']:.1f} tokens (adaptive + BPE)")
-    st, res = bpe_run("dwt_adaptive_bpe", "dwt_adaptive")
-    if res == "–":
-        st, res = "planned", "Queued to start after the fixed-Haar BPE smoke test."
-    node("ABPE", "S4H" if oc else "BPE", "BPE over adaptive Haar tokens", st,
-         "The offline check (parent node) found Haar with per-chunk plans + BPE gives the fewest tokens (≈50 per chunk) at the lowest error "
-         "of the four codec/BPE combinations, so it replaced the sym4→haar run.",
-         "Does BPE on adaptive plans give the fewest tokens without hurting success?",
-         bpe_setup("Haar DWT with per-chunk plans chosen by the oracle + BPE merges of coefficient runs; 1,024 tokens.",
-                   "lc_s0_dwt_adaptive: same seed and recipe, no BPE."),
-         res, "One seed only.", short=res.split(". ")[0] if st != "planned" else "queued, 1 seed")
+    qs = jload(RES / "quant_sweep.json")
+    if qs:
+        fq = qs["fast"]
+        pick = lambda st_, sch, sc, dz: next((x for x in qs["rows"] if (x["stream"], x["scheme"], x["scale"], x["deadzone"]) == (st_, sch, sc, dz)), None)  # noqa: E731
+        pts = [("current quantizer, current stream", pick("segment", "uniform", 1, 0.0)),
+               ("detail steps ×4, current stream", pick("segment", "uniform", 4, 0.0)),
+               ("current quantizer, compact stream", pick("compact", "uniform", 1, 0.0)),
+               ("finest details ×6 + zero band, compact stream (chosen)", pick("compact", "fine", 6, 0.3)),
+               ("detail steps ×8, compact stream", pick("compact", "uniform", 8, 0.0))]
+        node("QS", "BPE", "Finding: coarse detail quantization + compact stream", "done",
+             "BPE alone only shortened DWT chunks from 69 to about 51 tokens. FAST is short mainly because it rounds high-frequency DCT "
+             "coefficients coarsely (most become 0) and BPE packs the zeros; our DWT quantizer is nearly lossless, and about 9 tokens per "
+             "chunk are structure tokens that a fixed plan does not need.",
+             "How close to FAST's token count can DWT + BPE get at FAST's error?",
+             [("Model", NO_MODEL),
+              ("Data", "Same protocol as Stage A: LIBERO actions from all 40 tasks, fitted on the training split, scored on 2,674 held-out chunks."),
+              ("Swept", "Detail-coefficient step ×1–32 (uniform, or finest details coarsest), optional zero band, current vs compact stream "
+               "(coefficients, one gripper block, end: no LEN/RES tokens)."),
+              ("Target", f"FAST: {fq['tokens']:.1f} tokens per chunk at MSE {fq['mse']:.1e}.")],
+             " ".join(f"{name}: {x['tokens_bpe']:.1f} tokens, {x['mse_vs_fast']:.2f}× FAST's error." for name, x in pts if x),
+             "At FAST's error DWT needs about 29 tokens (1.17× FAST). Matching FAST's token count exactly would cost about 2.7× its error. "
+             "Not trained: after the BPE smoke test lost badly, a DCT control without BPE was run instead (scripts/quant_sweep.py).",
+             short="≈29 tokens at FAST's error (FAST 25)")
+    st, _ = bpe_run("dct_fixed", "dwt_fixed")
+    steps = (250, 500, 1000, 1500, 2000)
+    pooled = {v: {step: lc_pooled(rows, v, step) for step in steps} for v in ("dct_fixed", "dwt_fixed", "fast_matched")}
+    n_seeds = max(p[2] for p in pooled["dct_fixed"].values())
+    if n_seeds == 0:
+        res, short = "Starting.", "queued"
+    else:
+        line = lambda v: ", ".join(f"{step}: {k}/{n}" for step, (k, n, _) in pooled[v].items() if n)  # noqa: E731
+        res = (f"Success pooled over {n_seeds} seed(s), 20 episodes each. DCT without BPE: {line('dct_fixed')}. "
+               f"Haar without BPE: {line('dwt_fixed')}. FAST (DCT + BPE): {line('fast_matched')}. "
+               "DCT without BPE produced no malformed streams (FAST: 80–100% malformed). ")
+        k2, n2, _ = pooled["dct_fixed"][2000]
+        short = f"{k2}/{n2} @2k ({n_seeds} seeds)" if n2 else f"{n_seeds} seeds, evaluating"
+        if n_seeds == 3 and n2 == 60:
+            res += ("Removing BPE from the DCT closes most of the gap to Haar, so most of FAST's deficit is the token format (BPE, free decoding). "
+                    "Haar still beats DCT in paired tests at 1,000 and 2,000 steps (p ≈ 0.002 and 0.04, uncorrected), so the transform matters too, less.")
+        st = "done" if n_seeds == 3 and n2 == 60 else "running"
+    node("DCT", "BPE", "DCT control without BPE", st,
+         "The FAST baseline always used BPE (it is part of FAST), while every DWT run before the BPE smoke test did not, and adding BPE "
+         "to DWT made it much worse. So the FAST-vs-DWT gap may come from BPE, not from DCT vs wavelets. This control replaced the planned "
+         "coarse-quantization DWT run, because FAST's other ingredients (BPE, coarse rounding) are removed here too.",
+         "With BPE removed from both, does the wavelet transform still beat the DCT?",
+         bpe_setup("Whole-chunk orthonormal DCT-II (FAST's transform), 10 coefficients per dimension at full resolution, the same 256-level "
+                   "quantizer, token vocabulary and grammar-constrained decoding as DWT; no BPE and no FAST-style coarse rounding. 64 tokens per chunk.",
+                   "lc_s{0,1,2}_dwt_fixed (Haar, 69 tokens, no BPE) and lc_s{0,1,2}_fast_matched (FAST DCT + BPE), same seeds and recipe."),
+         res, "Offline at equal quantization DCT and Haar are about equally accurate (MSE 1.6e-4 vs 1.45e-4 on all tasks). "
+         "Seed 0 ran first; seeds 1 and 2 were added so the control matches the 3-seed learning curve.",
+         short=short)
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",

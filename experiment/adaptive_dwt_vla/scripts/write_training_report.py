@@ -33,12 +33,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from write_reports import load_run, mcnemar_exact  # noqa: E402
 from lerobot_policy_adaptive_dwt.metrics import wilson_ci  # noqa: E402
 
-VARIANTS = ("fast_matched", "dwt_fixed", "dwt_adaptive")
-LABEL = {"fast_matched": "FAST (DCT + BPE)", "dwt_fixed": "DWT fixed plan", "dwt_adaptive": "DWT adaptive"}
-COLOR = {"fast_matched": "#d9534f", "dwt_fixed": "#2a7ab9", "dwt_adaptive": "#3c9d5d"}
+VARIANTS = ("fast_matched", "dwt_fixed", "dwt_adaptive", "dct_fixed")
+LABEL = {"fast_matched": "FAST (DCT + BPE)", "dwt_fixed": "DWT fixed plan", "dwt_adaptive": "DWT adaptive", "dct_fixed": "DCT, no BPE (control)"}
+COLOR = {"fast_matched": "#d9534f", "dwt_fixed": "#2a7ab9", "dwt_adaptive": "#3c9d5d", "dct_fixed": "#e08e0b"}
 SEEDS = (0, 1, 2)
 DASH = {0: "-", 1: "--", 2: ":"}
-COEF_ACC = {"fast_matched": "val_acc_fast", "dwt_fixed": "val_acc_coef", "dwt_adaptive": "val_acc_coef"}
+COEF_ACC = {"fast_matched": "val_acc_fast", "dwt_fixed": "val_acc_coef", "dwt_adaptive": "val_acc_coef", "dct_fixed": "val_acc_coef"}
 
 
 def esc(x) -> str:
@@ -123,7 +123,8 @@ def lc_results(rows, episodes_of):
 
 
 def plot_train_loss(lc):
-    fig, axes = plt.subplots(1, 3, figsize=(15, 3.8), sharey=False)
+    fig, axes = plt.subplots(2, 2, figsize=(13, 7), sharey=False)
+    axes = axes.ravel()
     for ax, v in zip(axes, VARIANTS):
         for s in SEEDS:
             r = lc.get((v, s))
@@ -278,6 +279,12 @@ def main() -> None:
         "and compared by closed-loop success in simulation. With the same steps and the same GPU time, the fixed-plan DWT beat the FAST baseline "
         "at every checkpoint from 1000 steps on, and adaptive DWT overtook FAST from 1500 steps on. "
         "The FAST baseline peaked at 1000 steps and then declined, while almost all of its generated streams were malformed (they did not decode to exactly 70 DCT coefficients).</p>")
+    if all((v, s) in lc for v in ("dct_fixed",) for s in SEEDS):
+        kd, kf, kh = final["dct_fixed"][0], final["fast_matched"][0], final["dwt_fixed"][0]
+        add(f"<p>A fourth variant, added afterwards as a control, keeps FAST's transform (DCT) but drops BPE and uses the DWT runs' quantizer, vocabulary and "
+            f"grammar-constrained decoding. It reached {kd}/60 at 2000 steps, between FAST ({kf}/60) and fixed-plan Haar DWT ({kh}/60), with no malformed streams. "
+            "Most of FAST's gap is therefore the token format (BPE and free decoding); the transform accounts for a smaller but still measurable part "
+            "(paired tests in section 4: Haar beats DCT at 1000 and 2000 steps, p &lt; 0.05 uncorrected).</p>")
 
     # ---- setup
     add("<h2>1. What was trained</h2>")
@@ -299,7 +306,7 @@ def main() -> None:
         ["hardware", f"1 × {esc(cfg['gpu'])} (48 GB), bf16"],
     ]))
 
-    add("<h3>The three action tokenizers</h3>")
+    add("<h3>The four action tokenizers</h3>")
     ad, fx = codec["adaptive"], codec["fixed"]
     add(table(["variant", "encoding", "tokens / chunk (train windows)", "vocabulary", "decoding at inference"], [
         [esc(LABEL["fast_matched"]), "DCT per dimension → quantize → BPE (stock π₀-FAST tokenizer)", "≈31 (measured in rollouts)", "FAST BPE vocab (pretrained on other robots)",
@@ -308,6 +315,8 @@ def main() -> None:
          f"{fx['train']['vocab_size']} reserved tokens", "grammar-constrained (FSM-masked) decoding → inverse DWT"],
         [esc(LABEL["dwt_adaptive"]), f"Haar (db1), periodization; plan chosen per chunk by a rate–distortion DP oracle (γ = {ad['weights']['gamma']})",
          f"{num(ad['train']['tokens_mean'], 1)} (p95 {num(ad['train']['tokens_p95'], 0)})", f"{ad['train']['vocab_size']} reserved tokens", "grammar-constrained decoding → inverse DWT"],
+        [esc(LABEL["dct_fixed"]), "orthonormal DCT-II over the whole chunk per dimension, octave bands as levels; same quantizer and stream grammar as DWT fixed, no BPE",
+         "≈64 (measured in rollouts)", "same reserved-token scheme as DWT", "grammar-constrained decoding → inverse DCT"],
     ]))
     if (RES / "pareto_H10.png").exists():
         add("<p>Offline codec comparison (reconstruction error vs tokens per chunk, before any training):</p>" + png_html(RES / "pareto_H10.png", "codec pareto"))
@@ -372,18 +381,23 @@ def main() -> None:
             body.append([esc(LABEL[v]), step, *[f"{sum(d[s].values())}/{len(d[s])}" if s in d else "–" for s in SEEDS],
                          f"<b>{k}/{n} = {k / n:.2f}</b>", f"[{lo:.2f}, {hi:.2f}]", f"{100 * mc / max(ch, 1):.0f}%"])
     add(table(["variant", "step", "seed 0", "seed 1", "seed 2", "pooled", "95% Wilson CI", "malformed chunks"], body))
-    body = []
-    for v in ("dwt_fixed", "dwt_adaptive"):
+    def paired(v, ref):
+        body = []
         for step in sorted(s for (vv, s) in res if vv == v):
             b = c = 0
             for s in SEEDS:
-                a, f_ = res.get((v, step), {}).get(s, {}), res.get(("fast_matched", step), {}).get(s, {})
+                a, f_ = res.get((v, step), {}).get(s, {}), res.get((ref, step), {}).get(s, {})
                 for i in a.keys() & f_.keys():
                     b += a[i] and not f_[i]
                     c += f_[i] and not a[i]
             body.append([esc(LABEL[v]), step, b, c, f"{mcnemar_exact(b, c):.3f}"])
+        return body
+
     add("<h3>Paired test against FAST (same seed, step and initial state; exact McNemar)</h3>")
-    add(table(["variant", "step", "only DWT succeeds", "only FAST succeeds", "p"], body))
+    add(table(["variant", "step", "only this variant succeeds", "only FAST succeeds", "p"],
+              [r for v in ("dwt_fixed", "dwt_adaptive", "dct_fixed") for r in paired(v, "fast_matched")]))
+    add("<h3>Paired test: Haar DWT fixed vs DCT without BPE (transform only)</h3>")
+    add(table(["variant", "step", "only Haar succeeds", "only DCT succeeds", "p"], paired("dwt_fixed", "dct_fixed")))
 
     pil = [r for r in rows if "@pilot_" in r["model"] or r["model"].startswith("ref_")]
     body = [[f"<code>{esc(r['model'])}</code>", f"{r['successes']}/{r['episodes']}", f"[{r['ci_low']:.2f}, {r['ci_high']:.2f}]", num(r["tokens_mean"], 1),
@@ -405,8 +419,58 @@ def main() -> None:
     add("<p>Latency is autoregressive generation of one chunk with a KV cache on the A6000. DWT streams are about twice as long as FAST streams, so latency roughly doubles; "
         "at 10 executed actions per chunk this is still within LIBERO's simulated control loop but would need speculative or parallel decoding for real-time control at higher rates.</p>")
 
+    # ---- follow-up controls
+    add("<h2>6. Follow-up: which part of the token format matters? (seed 0)</h2>")
+    add("<p>The FAST baseline always used BPE (it is part of FAST), while the DWT runs above did not, so the FAST-vs-DWT gap mixes the transform "
+        "(DCT vs wavelet) with BPE. Two single-seed runs with the identical recipe separate them: Haar DWT <i>with</i> BPE, and FAST's DCT "
+        "<i>without</i> BPE (same quantizer, vocabulary and grammar-constrained decoding as DWT). Same base model, task, seed 0 and initial states as above.</p>")
+    fu = [("fast_matched", "DCT (FAST)", "yes (FAST)", "#d9534f"), ("dwt_fixed", "Haar DWT", "no", "#2a7ab9"),
+          ("dwt_fixed_bpe", "Haar DWT", "yes", "#8e44ad"), ("dct_fixed", "DCT, whole chunk", "no", "#e08e0b")]
+    steps_fu = [250, 500, 1000, 1500, 2000]
+    body, fig, ax = [], *plt.subplots(figsize=(8.5, 4.2))
+    for v, tr, bpe, col in fu:
+        rs = {st: rowmap.get((v, 0, st)) for st in steps_fu}
+        run = load_run(f"lc_s0_{v}") if (ROOT / "runs" / f"lc_s0_{v}" / "config.json").exists() else None
+        if not run:
+            body.append([f"<code>{v}</code>", tr, bpe, "–", *["–"] * len(steps_fu), "not run yet", "–", "–"])
+            continue
+        b = run["config"].get("bpe")
+        ttok = f"{b['train_tokens_mean_after']:.1f}" if b else "–"
+        cells = [f"{rs[st]['successes']}/{rs[st]['episodes']}" if rs[st] else "–" for st in steps_fu]
+        last = rs[2000]
+        state = run["status"].get("state", "")
+        body.append([f"<code>{v}</code>", tr, bpe, ttok, *cells,
+                     num(last["tokens_mean"], 1) if last else (f"training ({state})" if state != "done" else "evaluating"),
+                     num(last["latency_ms_mean"], 0) if last else "–",
+                     ("n/a" if last["invalid_streams"] is None else f"{100 * last['invalid_streams'] / max(last['chunks'], 1):.0f}%") if last else "–"])
+        xs = [st for st in steps_fu if rs[st]]
+        if xs:
+            ax.plot(xs, [rs[st]["successes"] / rs[st]["episodes"] for st in xs], "o-", color=col, lw=2, label=f"{tr}, BPE {bpe}")
+    ax.set_xlabel("optimizer step"); ax.set_ylabel("success rate (20 episodes)"); ax.set_ylim(-0.02, 1.02); ax.grid(alpha=0.3)
+    ax.set_title("Seed 0: transform and BPE separated"); ax.legend(fontsize=8, loc="upper left")
+    add(fig_html(fig, "follow-up success vs step"))
+    add(table(["run (seed 0)", "transform", "BPE", "train tokens / chunk after BPE", *[f"success @{st}" for st in steps_fu],
+               "tokens / chunk @2000 (inference)", "latency ms @2000", "malformed chunks @2000"], body))
+    rb, rf = rowmap.get(("dwt_fixed_bpe", 0, 2000)), rowmap.get(("dwt_fixed", 0, 2000))
+    rd = rowmap.get(("dct_fixed", 0, 2000))
+    if rb and rf:
+        add(f"<p><b>BPE hurts DWT.</b> With BPE the Haar DWT policy reached {rb['successes']}/20 at 2000 steps against {rf['successes']}/20 without it "
+            f"(and {rowmap[('dwt_fixed_bpe', 0, 1000)]['successes']}/20 vs {rowmap[('dwt_fixed', 0, 1000)]['successes']}/20 at 1000 steps), although streams were shorter "
+            f"({rb['tokens_mean']:.0f} vs {rf['tokens_mean']:.0f} tokens) and generation faster ({rb['latency_ms_mean']:.0f} vs {rf['latency_ms_mean']:.0f} ms). "
+            "Held-out loss per chunk was about 20% higher with BPE: each merged token fixes several coefficient values at once and is drawn from a 4× larger "
+            "vocabulary. Early checkpoints also spelled coefficients out instead of using merges (67 tokens per chunk at 250 steps). One seed.</p>")
+    if rd and rf:
+        add(f"<p><b>DCT without BPE</b> reached {rd['successes']}/20 at 2000 steps, against {rf['successes']}/20 for Haar without BPE and "
+            f"{rowmap.get(('fast_matched', 0, 2000), {}).get('successes', '–')}/20 for FAST (DCT with BPE), same seed. "
+            "It was then repeated with seeds 1 and 2 and appears as a fourth variant in sections 3–5.</p>")
+    else:
+        add("<p><b>DCT without BPE</b> is training now; this section fills in when its evaluation finishes.</p>")
+    add("<div class='note'>An offline sweep (<code>scripts/quant_sweep.py</code>) found that coarser rounding of the detail coefficients plus a compact stream "
+        "would bring DWT + BPE to about 29 tokens per chunk at FAST's error (FAST: 25). That run was dropped in favour of the DCT control above; "
+        "see the <a href='experiment_trail.html'>experiment trail</a>.</div>")
+
     # ---- weights
-    add("<h2>6. Released LoRA weights</h2>")
+    add("<h2>7. Released LoRA weights</h2>")
     add("<p>Adapter-only checkpoints (LoRA + action-row adapters, fp32 safetensors) plus <code>meta.json</code> (codec parameters, normalization statistics, base-model revision). "
         "The frozen base model is downloaded from Hugging Face on load. Stored in git with Git LFS under <code>experiment/adaptive_dwt_vla/weights/</code>.</p>")
     body = []
@@ -450,7 +514,7 @@ def main() -> None:
                           "–" if "op_jerk_ratio" not in b else f"{b['op_jerk_ratio']:.2f}"]
             body.append(cells)
         hdr = ["rank", "transform"] + [c for hz in hzs for c in (f"H{hz} mode", f"H{hz} tokens @FAST", f"H{hz} vs Haar", f"H{hz} jerk ratio")]
-        add("<h2>7. Wavelet choice (offline selection test)</h2>")
+        add("<h2>8. Wavelet choice (offline selection test)</h2>")
         add(f"<p>All trained models use Haar (db1). An offline test compared {len(names)} transforms (20 standard wavelets and mixed transforms that use a different wavelet "
             "at each level, each in periodization and symmetric mode) by the coefficient tokens needed to match FAST's reconstruction accuracy on held-out windows. "
             "Top 6 plus common wavelets for reference; full results, rate–distortion curves and basis-shape plots in "
@@ -460,19 +524,20 @@ def main() -> None:
             "This measures how compactly each transform represents the motion, not how well a policy learns its tokens; none of the alternatives has been trained.</p>")
 
     # ---- caveats
-    add("<h2>8. Caveats</h2><ul>")
+    add("<h2>9. Caveats</h2><ul>")
     for c in [
         "One task and one instruction. Nothing here says how the tokenizers behave in multi-task training or on other robots.",
         "20 episodes per checkpoint and 3 seeds: confidence intervals are wide, and the paired tests are not corrected for multiple comparisons.",
         "The FAST baseline learns LIBERO FAST tokens through the same small LoRA budget. Its low value-token accuracy and malformed streams suggest part of the gap is "
-        "how hard BPE tokens are to adapt under this recipe; the fully fine-tuned reference shows FAST itself can solve the task.",
+        "how hard BPE tokens are to adapt under this recipe; the fully fine-tuned reference shows FAST itself can solve the task. This was tested directly: "
+        "adding BPE to DWT made it much worse (one seed, section 6), and removing BPE from DCT made it much better (three seeds, sections 4–5).",
         "Training is not bit-reproducible: rerunning seed 0 did not exactly reproduce the pilot because of nondeterministic GPU kernels.",
         "Models are LoRA fine-tunes, not full fine-tunes; the base model stays frozen.",
     ]:
         add(f"<li>{esc(c)}</li>")
     add("</ul>")
 
-    add("<h2>9. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla\n"
+    add("<h2>10. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla\n"
         "PY=~/miniconda3/envs/smooth-operator-vla/bin/python\n"
         "$PY scripts/prepare_libero.py                 # index + train/val split (downloads lerobot/libero)\n"
         "bash scripts/run_learning_curve.sh 0 1 2      # 9 runs × 2000 steps + checkpoint evals (≈24 h on one A6000)\n"

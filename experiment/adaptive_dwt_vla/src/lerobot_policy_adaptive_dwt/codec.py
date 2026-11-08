@@ -64,9 +64,9 @@ class AdaptiveDWTCodec:
 
     # ------------------------------------------------------------------ fitting
     @classmethod
-    def fit(cls, spec: CodecSpec, train_windows: np.ndarray) -> "AdaptiveDWTCodec":
+    def fit(cls, spec: CodecSpec, train_windows: np.ndarray, **quantizer_kw) -> "AdaptiveDWTCodec":
         x = np.asarray(train_windows, dtype=np.float64)[..., spec.cont_dims]
-        q = CoefficientQuantizer(spec.n_bins, spec.quantile).fit(x, spec.lengths)
+        q = CoefficientQuantizer(spec.n_bins, spec.quantile, **quantizer_kw).fit(x, spec.lengths)
         return cls(spec, q)
 
     def to_dict(self) -> dict:
@@ -150,10 +150,12 @@ class AdaptiveDWTCodec:
         tokens = serialize(segments, self.vocab)
         return tokens, recon, {"clipped": n_clipped, "coefs": n_coefs}
 
+    def segments(self, tokens: list[int]) -> list[Segment]:
+        return parse(list(tokens), self.vocab, self.spec.horizon, tuple(self.spec.lengths), self.spec.n_cont)
+
     def decode(self, tokens: list[int]) -> np.ndarray:
         """Strictly parse and reconstruct a (H, 7) normalized action window."""
-        segments = parse(list(tokens), self.vocab, self.spec.horizon, tuple(self.spec.lengths), self.spec.n_cont)
-        return self.decode_segments(segments)
+        return self.decode_segments(self.segments(tokens))
 
     def decode_segments(self, segments: list[Segment]) -> np.ndarray:
         spec = self.spec

@@ -19,6 +19,7 @@ import torch
 from lerobot.processor import ProcessorStepRegistry
 from lerobot.processor.tokenizer_processor import ActionTokenizerProcessorStep
 
+from .bpe import load_codec
 from .codec import AdaptiveDWTCodec
 from .oracle_dp import OracleWeights, solve
 
@@ -51,12 +52,12 @@ class DWTActionTokenizerStep(ActionTokenizerProcessorStep):
         super().__post_init__()
         if self.codec_state is None:
             raise ValueError("codec_state is required")
-        self._codec = AdaptiveDWTCodec.from_dict(self.codec_state)
+        self._codec = load_codec(self.codec_state)
         self._prefix = self._paligemma_tokenizer.encode(ACTION_PREFIX_TEXT, add_special_tokens=False)
         self.last_plans: list = []
 
     @property
-    def codec(self) -> AdaptiveDWTCodec:
+    def codec(self):
         return self._codec
 
     def plan_for(self, window: np.ndarray):
