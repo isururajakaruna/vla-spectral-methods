@@ -33,7 +33,7 @@ def jload(p: Path):
 
 def eval_rows():
     d = jload(RES / "eval.json")
-    return d["rows"] if d else []
+    return [r for r in d["rows"] if r["task"] == "libero_object#0"] if d else []
 
 
 def episodes_of(r):
@@ -176,13 +176,15 @@ def build_nodes():
              "Fixed-plan DWT is best from 1,000 steps on; adaptive must also predict its own plan and learns more slowly.",
              short=f"fixed {lc['dwt_fixed'][0] / lc['dwt_fixed'][1]:.2f} · adaptive {lc['dwt_adaptive'][0] / lc['dwt_adaptive'][1]:.2f} · FAST {lc['fast_matched'][0] / lc['fast_matched'][1]:.2f}",
              link="training_report.html")
+        n_w = len(list((ROOT / "weights").glob("*/adapters.safetensors")))
         node("W", "LC", "Released weights + training report", "done",
              "The learning curve confirmed the result, so the trained adapters were published to make it reproducible.",
              "What was released?",
-             [("What is in git", "LoRA + row-adapter weights only (Git LFS), 12 final checkpoints: 9 learning-curve runs + 3 pilots. "
+             [("What is in git", f"LoRA + row-adapter weights only (Git LFS), {n_w} final checkpoints: 9 learning-curve runs, 3 pilots, then the "
+               "follow-up step-2000 checkpoints (DCT without BPE × 3 seeds, sym4→haar). "
                "The base model is not included; it is downloaded from Hugging Face."),
               ("Trained on", OUR_DATA)],
-             "12 adapter checkpoints with SHA-256 sums and an HTML training report.", link="training_report.html", short="12 checkpoints on git (LFS)")
+             f"{n_w} adapter checkpoints with SHA-256 sums and an HTML training report.", link="training_report.html", short=f"{n_w} checkpoints on git (LFS)")
 
     ws = jload(RES / "wavelet_selection.json")
     if ws:
@@ -254,7 +256,7 @@ def build_nodes():
               ("Compared", "Haar vs sym4→haar, fixed vs adaptive depth, with and without BPE.")],
              "; ".join(f"{c} {m}: {fmt(x)}" for (c, m), x in r.items()) + ".",
              "Haar's 8+2 segmentation suits 10 steps, while sym4→haar needs symmetric padding (16 coefficients per dimension instead of 10). "
-             "Its only advantage is smoother output. Not trained; revisit with 32-step chunks.",
+             "Its only advantage is smoother output. Not trained with BPE; the fixed plan without BPE was trained later (child node).",
              short=f"Haar wins: {r[('haar', 'adaptive')]['tokens_bpe']:.1f} vs {r[('mix:sym4→haar', 'adaptive')]['tokens_bpe']:.1f} tokens (adaptive + BPE)")
     qs = jload(RES / "quant_sweep.json")
     if qs:
@@ -307,6 +309,57 @@ def build_nodes():
          res, "Offline at equal quantization DCT and Haar are about equally accurate (MSE 1.6e-4 vs 1.45e-4 on all tasks). "
          "Seed 0 ran first; seeds 1 and 2 were added so the control matches the 3-seed learning curve.",
          short=short)
+    s4 = {step: by_model.get(f"dwt_fixed_s4h@lc_s0_dwt_fixed_s4h:step_{step:05d}") for step in steps}
+    st4, _ = run_status("lc_s0_dwt_fixed_s4h")
+    if st4 != "planned" and "S4H" in N:
+        hf = {step: by_model.get(f"dwt_fixed@lc_s0_dwt_fixed:step_{step:05d}") for step in steps}
+        dc = {step: by_model.get(f"dct_fixed@lc_s0_dct_fixed:step_{step:05d}") for step in steps}
+        seq = lambda d: ", ".join(f"{step}: {r['successes']}/20" for step, r in d.items() if r)  # noqa: E731
+        if s4[2000]:
+            r4, rh = s4[2000], hf[2000]
+            res = (f"Success, seed 0: sym4→haar {seq(s4)}. Haar fixed {seq(hf)}. DCT without BPE {seq(dc)}. "
+                   f"Tokens per chunk {r4['tokens_mean']:.0f} vs Haar {rh['tokens_mean']:.0f}; latency {r4['latency_ms_mean']:.0f} vs {rh['latency_ms_mean']:.0f} ms; no malformed chunks.")
+            short4 = f"{r4['successes']}/20 @2k vs Haar {rh['successes']}/20, {r4['tokens_mean']:.0f} tokens"
+            st4 = "done"
+        else:
+            res, short4, st4 = "Training or evaluating.", "running", "running"
+        node("S4HT", "S4H", "sym4→haar DWT trained (fixed, no BPE)", st4,
+             "The offline check said sym4→haar loses at 10-step chunks, but offline token counts do not always predict how well a policy "
+             "learns. Train it once, exactly like Haar fixed, to measure it instead of assuming.",
+             "Does the mixed sym4→haar wavelet train into a better policy than Haar at 10-step chunks?",
+             bpe_setup("Whole-chunk sym4→haar DWT (sym4 at the finest level, Haar at the coarser levels), symmetric boundary mode, full-depth fixed plan, same "
+                       "quantizer, vocabulary and grammar-constrained decoding as Haar; no BPE. 100 tokens per chunk (token cap 117 instead of 96).",
+                       "lc_s0_dwt_fixed (Haar, 69 tokens) and lc_s0_dct_fixed (DCT, 64 tokens), same seed and recipe."),
+             res, "Close to Haar at 2,000 steps but slower and less steady to learn, with 45% more tokens per chunk and slower generation. "
+             "Its offline advantage is at 32-step chunks (Stage E). One seed.", short=short4, link="training_report.html")
+
+    gen = [r for r in (jload(RES / "eval.json") or {"rows": []})["rows"]
+           if r["task"] != "libero_object#0" and re.match(r"^\w+@lc_s0_\w+:step_02000$", r["model"])]
+    if gen:
+        gl = {"dwt_fixed": "Haar fixed", "dwt_fixed_s4h": "sym4→haar fixed", "dct_fixed": "DCT no BPE", "dwt_adaptive": "Haar adaptive"}
+        tot = {}
+        for r in gen:
+            v = r["model"].split("@")[0]
+            k, n = tot.get(v, (0, 0))
+            tot[v] = (k + r["successes"], n + r["episodes"])
+        hit = sorted({re.sub(r"^pick up the (.*) and place it in the basket$", r"\1", r["instruction"]) for r in gen if r["successes"]})
+        res = ("Success on the 9 new objects (45 episodes each): " + ", ".join(f"{gl.get(v, v)} {k}/{n}" for v, (k, n) in tot.items()) + ". "
+               f"Every success is on {' or '.join(hit)}.")
+        best = max(tot, key=lambda v: tot[v][0])
+        node("GEN", "LC", "Zero-shot generalization · 9 new objects", "done",
+             "Every policy was trained on one instruction only, so its training-task score says nothing about whether the token format "
+             "helps it handle new instructions. Probe that cheaply with the existing checkpoints before considering multi-task training.",
+             "Do the single-task policies transfer to new objects in the same scene, and does the token format matter there?",
+             [("Models", "The seed-0, step-2000 checkpoints of Haar fixed, Haar adaptive, DCT without BPE and sym4→haar fixed. No new training."),
+              ("Trained on", OUR_DATA),
+              ("Evaluation", "The other nine libero_object tasks (#1–#9: same scene and basket, a different object and instruction), never seen in "
+               "training. 5 initial states per task drawn at random (seed 0) from 0–19, the same states for every model.")],
+             res, "The successes take about as long as an alphabet-soup success: the policies most likely replay the learned motion and succeed "
+             "where the new object happens to be reachable that way, rather than following the instruction (no videos to confirm). "
+             "The ranking matches the training task. Only Haar fixed vs Haar adaptive is significant in a paired test (6 vs 0 episodes "
+             "won alone, p = 0.03 uncorrected); Haar vs DCT (p = 0.22) and Haar vs sym4→haar (p = 0.73) are not. Seeds 1–2 were not run. "
+             "Real generalization needs multi-task training.",
+             short=f"≈0%: best {gl.get(best, best)} {tot[best][0]}/{tot[best][1]}", link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",

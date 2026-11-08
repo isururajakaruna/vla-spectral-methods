@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "results"
+TRAIN_TASK = "libero_object#0"
 sys.path.insert(0, str(ROOT / "src"))
 
 
@@ -193,7 +194,7 @@ def summary() -> str:
                   "they compare learning progress within a variant, not tokenizer quality across variants.", ""]
     ev = RES / "eval.json"
     if ev.exists():
-        rows = json.loads(ev.read_text())["rows"]
+        rows = [r for r in json.loads(ev.read_text())["rows"] if r["task"] == TRAIN_TASK]
         lines += ["## Stage D: closed-loop LIBERO (measured)", "",
                   "Same fixed initial states (listed per row) for every model, 256×256 renders, 10 actions executed "
                   "per chunk, suite max steps. 95% Wilson intervals.", ""]

@@ -138,6 +138,10 @@ def main() -> None:
     ap.add_argument("--task-ids", type=int, nargs="+", default=[0])
     ap.add_argument("--episodes", type=int, default=20)
     ap.add_argument("--first-init-state", type=int, default=0)
+    ap.add_argument("--sample", type=int, default=0,
+                    help="run only N initial states per task, drawn without replacement from the --episodes range "
+                         "(seeded by --sample-seed and the task id, so every model gets the same states)")
+    ap.add_argument("--sample-seed", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=0, help="0 = suite default")
     ap.add_argument("--videos", type=int, default=2, help="record the first N episodes per model/task")
     args = ap.parse_args()
@@ -160,8 +164,11 @@ def main() -> None:
             env_pre, env_post = make_env_pre_post_processors(scene.cfg, cfg)
             episodes = []
             path = out_dir / f"{label.replace(':', '_').replace('/', '_')}__{args.suite}_t{task_id}.json"
-            for i in range(args.episodes):
-                init = args.first_init_state + i
+            inits = [args.first_init_state + i for i in range(args.episodes)]
+            if args.sample:
+                rng = np.random.default_rng([args.sample_seed, task_id])
+                inits = sorted(int(x) for x in rng.choice(inits, size=args.sample, replace=False))
+            for i, init in enumerate(inits):
                 vid = ROOT / "results" / "videos" / f"{path.stem}_init{init}.mp4" if i < args.videos else None
                 ep = run_episode(scene, predict, telemetry, env_pre, env_post, instruction, init, max_steps, n_exec, vid)
                 episodes.append(ep)

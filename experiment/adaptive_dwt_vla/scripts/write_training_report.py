@@ -30,7 +30,7 @@ REPORTS = ROOT.parent / "reports"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from write_reports import load_run, mcnemar_exact  # noqa: E402
+from write_reports import TRAIN_TASK, load_run, mcnemar_exact  # noqa: E402
 from lerobot_policy_adaptive_dwt.metrics import wilson_ci  # noqa: E402
 
 VARIANTS = ("fast_matched", "dwt_fixed", "dwt_adaptive", "dct_fixed")
@@ -97,7 +97,7 @@ def sha256(path: Path) -> str:
 
 
 def load_eval():
-    rows = json.loads((RES / "eval.json").read_text())["rows"]
+    rows = [r for r in json.loads((RES / "eval.json").read_text())["rows"] if r["task"] == TRAIN_TASK]
 
     def episodes_of(r):
         suite, task = r["task"].split("#")
@@ -285,6 +285,11 @@ def main() -> None:
             f"grammar-constrained decoding. It reached {kd}/60 at 2000 steps, between FAST ({kf}/60) and fixed-plan Haar DWT ({kh}/60), with no malformed streams. "
             "Most of FAST's gap is therefore the token format (BPE and free decoding); the transform accounts for a smaller but still measurable part "
             "(paired tests in section 4: Haar beats DCT at 1000 and 2000 steps, p &lt; 0.05 uncorrected).</p>")
+    fb, fs = rowmap.get(("dwt_fixed_bpe", 0, 2000)), rowmap.get(("dwt_fixed_s4h", 0, 2000))
+    if fb and fs:
+        add(f"<p>Single-seed follow-ups (section 6): adding BPE to Haar DWT cut success to {fb['successes']}/20, and the mixed sym4→haar wavelet "
+            f"reached {fs['successes']}/20 with {fs['tokens_mean']:.0f} tokens per chunk, so neither beats plain Haar at 10-step chunks. "
+            "A zero-shot probe on nine new objects (section 7) finds that none of the single-task policies generalizes (0–13% success).</p>")
 
     # ---- setup
     add("<h2>1. What was trained</h2>")
@@ -318,6 +323,13 @@ def main() -> None:
         [esc(LABEL["dct_fixed"]), "orthonormal DCT-II over the whole chunk per dimension, octave bands as levels; same quantizer and stream grammar as DWT fixed, no BPE",
          "≈64 (measured in rollouts)", "same reserved-token scheme as DWT", "grammar-constrained decoding → inverse DCT"],
     ]))
+    add("<p>Single-seed follow-up tokenizers (section 6), same recipe:</p>")
+    add(table(["variant", "encoding", "tokens / chunk", "vocabulary", "decoding at inference"], [
+        ["Haar DWT fixed + BPE", "fixed-plan Haar coefficients, BPE merges of coefficient runs (structure and gripper tokens never merged)",
+         "≈54 (measured in rollouts)", "1024 reserved tokens", "grammar-constrained decoding → inverse DWT"],
+        ["sym4→haar DWT fixed", "whole-chunk DWT, sym4 at the finest level and Haar at the coarser levels, symmetric boundary mode, full-depth fixed plan, no BPE",
+         "≈100 (measured in rollouts)", "same reserved-token scheme as DWT", "grammar-constrained decoding → inverse DWT"],
+    ]))
     if (RES / "pareto_H10.png").exists():
         add("<p>Offline codec comparison (reconstruction error vs tokens per chunk, before any training):</p>" + png_html(RES / "pareto_H10.png", "codec pareto"))
 
@@ -331,6 +343,12 @@ def main() -> None:
                 continue
             st, t = r["status"], r["train"][-1]
             body.append([f"<code>lc_s{s}_{v}</code>", esc(LABEL[v]), s, st["step"], f"{st['gpu_hours']:.2f}", hms(st["wall_s"]),
+                         f"{st['sec_per_step']:.2f}", f"{t['vram_reserved_gb']:.1f}", f"{t['chunks_seen']:,}", f"{t['action_tokens_seen']:,}"])
+    for v, lab in (("dwt_fixed_bpe", "Haar DWT fixed + BPE (follow-up)"), ("dwt_fixed_s4h", "sym4→haar DWT fixed (follow-up)")):
+        if (ROOT / "runs" / f"lc_s0_{v}" / "config.json").exists():
+            r = load_run(f"lc_s0_{v}")
+            st, t = r["status"], r["train"][-1]
+            body.append([f"<code>lc_s0_{v}</code>", esc(lab), 0, st["step"], f"{st['gpu_hours']:.2f}", hms(st["wall_s"]),
                          f"{st['sec_per_step']:.2f}", f"{t['vram_reserved_gb']:.1f}", f"{t['chunks_seen']:,}", f"{t['action_tokens_seen']:,}"])
     for v, r in pilot.items():
         st, t = r["status"], r["train"][-1]
@@ -415,17 +433,24 @@ def main() -> None:
         if rs:
             body.append([esc(LABEL[v]), num(np.mean([r["tokens_mean"] for r in rs]), 1), num(np.mean([r["latency_ms_mean"] for r in rs]), 0),
                          num(np.mean([r["latency_ms_p95"] for r in rs]), 0)])
+    for v, lab in (("dwt_fixed_bpe", "Haar DWT fixed + BPE (seed 0 only)"), ("dwt_fixed_s4h", "sym4→haar DWT fixed (seed 0 only)")):
+        r = rowmap.get((v, 0, 2000))
+        if r:
+            body.append([esc(lab), num(r["tokens_mean"], 1), num(r["latency_ms_mean"], 0), num(r["latency_ms_p95"], 0)])
     add(table(["variant (step 2000, mean over seeds)", "tokens / chunk", "latency ms / chunk", "p95 ms"], body))
     add("<p>Latency is autoregressive generation of one chunk with a KV cache on the A6000. DWT streams are about twice as long as FAST streams, so latency roughly doubles; "
         "at 10 executed actions per chunk this is still within LIBERO's simulated control loop but would need speculative or parallel decoding for real-time control at higher rates.</p>")
 
     # ---- follow-up controls
-    add("<h2>6. Follow-up: which part of the token format matters? (seed 0)</h2>")
+    add("<h2>6. Follow-up: which part of the token format matters? BPE, transform, wavelet (seed 0)</h2>")
     add("<p>The FAST baseline always used BPE (it is part of FAST), while the DWT runs above did not, so the FAST-vs-DWT gap mixes the transform "
-        "(DCT vs wavelet) with BPE. Two single-seed runs with the identical recipe separate them: Haar DWT <i>with</i> BPE, and FAST's DCT "
-        "<i>without</i> BPE (same quantizer, vocabulary and grammar-constrained decoding as DWT). Same base model, task, seed 0 and initial states as above.</p>")
+        "(DCT vs wavelet) with BPE. Single-seed runs with the identical recipe separate them: Haar DWT <i>with</i> BPE, and FAST's DCT "
+        "<i>without</i> BPE (same quantizer, vocabulary and grammar-constrained decoding as DWT). A third run swaps Haar for the mixed "
+        "sym4→haar wavelet that won the offline wavelet test at 32-step chunks (section 9), fixed plan, no BPE. "
+        "Same base model, task, seed 0 and initial states as above.</p>")
     fu = [("fast_matched", "DCT (FAST)", "yes (FAST)", "#d9534f"), ("dwt_fixed", "Haar DWT", "no", "#2a7ab9"),
-          ("dwt_fixed_bpe", "Haar DWT", "yes", "#8e44ad"), ("dct_fixed", "DCT, whole chunk", "no", "#e08e0b")]
+          ("dwt_fixed_bpe", "Haar DWT", "yes", "#8e44ad"), ("dct_fixed", "DCT, whole chunk", "no", "#e08e0b"),
+          ("dwt_fixed_s4h", "sym4→haar DWT", "no", "#17a2b8")]
     steps_fu = [250, 500, 1000, 1500, 2000]
     body, fig, ax = [], *plt.subplots(figsize=(8.5, 4.2))
     for v, tr, bpe, col in fu:
@@ -465,12 +490,76 @@ def main() -> None:
             "It was then repeated with seeds 1 and 2 and appears as a fourth variant in sections 3–5.</p>")
     else:
         add("<p><b>DCT without BPE</b> is training now; this section fills in when its evaluation finishes.</p>")
+    rs4 = rowmap.get(("dwt_fixed_s4h", 0, 2000))
+    if rs4 and rf:
+        add(f"<p><b>sym4→haar does not beat Haar at 10-step chunks.</b> It reached {rs4['successes']}/20 at 2000 steps against {rf['successes']}/20 for Haar, "
+            f"but learned more slowly and less steadily ({', '.join(str(rowmap[('dwt_fixed_s4h', 0, st)]['successes']) for st in steps_fu)} of 20 at "
+            f"{', '.join(map(str, steps_fu))} steps). At this length sym4 needs symmetric padding, so its streams are {rs4['tokens_mean']:.0f} tokens "
+            f"instead of {rf['tokens_mean']:.0f} and generation is slower ({rs4['latency_ms_mean']:.0f} vs {rf['latency_ms_mean']:.0f} ms), "
+            "as the offline check predicted. Its offline advantage is at 32-step chunks, which no policy has been trained on yet. One seed.</p>")
     add("<div class='note'>An offline sweep (<code>scripts/quant_sweep.py</code>) found that coarser rounding of the detail coefficients plus a compact stream "
         "would bring DWT + BPE to about 29 tokens per chunk at FAST's error (FAST: 25). That run was dropped in favour of the DCT control above; "
         "see the <a href='experiment_trail.html'>experiment trail</a>.</div>")
 
+    # ---- zero-shot generalization
+    gen_rows = [r for r in json.loads((RES / "eval.json").read_text())["rows"]
+                if r["task"] != TRAIN_TASK and re.match(r"^\w+@lc_s0_\w+:step_02000$", r["model"])]
+    if gen_rows:
+        add("<h2>7. Zero-shot generalization to new objects (seed 0)</h2>")
+        add("<p>Every model above was trained on one instruction only. As a first generalization probe, the seed-0 step-2000 checkpoints were run "
+            "on the other nine <code>libero_object</code> tasks: the same scene type and basket, a different object to pick up, and the new instruction "
+            "in the prompt. Five initial states per task were drawn at random (seed 0) from states 0–19, a different draw per task and the same "
+            "states for every model; 45 episodes per model. Nothing was trained on these tasks.</p>")
+        gv = [v for v in ("dwt_fixed", "dwt_fixed_s4h", "dct_fixed", "dwt_adaptive") if any(r["model"].startswith(v + "@") for r in gen_rows)]
+        glabel = {"dwt_fixed": "Haar DWT fixed", "dwt_fixed_s4h": "sym4→haar DWT fixed", "dct_fixed": "DCT, no BPE", "dwt_adaptive": "Haar DWT adaptive"}
+        by = {(r["model"].split("@")[0], r["task"]): r for r in gen_rows}
+        tasks = sorted({r["task"] for r in gen_rows}, key=lambda t: int(t.split("#")[1]))
+        obj = {r["task"]: re.sub(r"^pick up the (.*) and place it in the basket$", r"\1", r["instruction"]) for r in gen_rows}
+        body = []
+        for t in tasks:
+            cells = []
+            for v in gv:
+                r = by.get((v, t))
+                cells.append(f"{r['successes']}/{r['episodes']}" if r else "–")
+            body.append([f"#{t.split('#')[1]} {esc(obj[t])}", esc(", ".join(map(str, by[(gv[0], t)]["init_states"]))), *cells])
+        tot = {v: (sum(by[(v, t)]["successes"] for t in tasks if (v, t) in by), sum(by[(v, t)]["episodes"] for t in tasks if (v, t) in by)) for v in gv}
+        body.append(["<b>total</b>", "", *[f"<b>{k}/{n}</b>" for k, n in (tot[v] for v in gv)]])
+        tr0 = {v: rowmap.get((v, 0, 2000)) for v in gv}
+        body.append(["training task (#0, 20 states)", "0–19", *[f"{tr0[v]['successes']}/20" if tr0[v] else "–" for v in gv]])
+        add(table(["task (new object)", "initial states", *[glabel[v] for v in gv]], body))
+
+        def succ(v):
+            out = {}
+            for t in tasks:
+                r = by.get((v, t))
+                for e in (episodes_of(r) if r else []):
+                    out[(t, e["init_state"])] = bool(e["success"])
+            return out
+
+        ref = succ("dwt_fixed")
+        pbody, sig = [], []
+        for v in gv[1:]:
+            o = succ(v)
+            b = sum(ref[k] and not o[k] for k in ref.keys() & o.keys())
+            c = sum(o[k] and not ref[k] for k in ref.keys() & o.keys())
+            pbody.append([glabel[v], b, c, f"{mcnemar_exact(b, c):.2f}"])
+            pv = mcnemar_exact(b, c)
+            if pv < 0.05:
+                sig.append(f"{glabel[v]} (p = {pv:.2f})")
+        add("<h3>Paired test against Haar DWT fixed (same task and initial state; exact McNemar)</h3>")
+        add(table(["variant", "only Haar fixed succeeds", "only this variant succeeds", "p"], pbody))
+        hit = sorted({t for (v, t), r in by.items() if r["successes"]}, key=lambda t: int(t.split("#")[1]))
+        add(f"<p>All models fail almost everywhere: every success of every model is on {' or '.join(esc(obj[t]) for t in hit)}, and the "
+            "successful episodes are about as long as a successful alphabet-soup episode (≈145 steps). The likeliest reading is that the policies "
+            "replay the motion learned on the training task and succeed where the named object happens to be reachable that way, rather than "
+            "following the new instruction; no videos were recorded, so this is not confirmed. The ranking matches the training task "
+            "(Haar fixed highest, adaptive lowest). "
+            + (f"Haar fixed beats {', '.join(sig)} in the paired test (uncorrected, one seed); the other differences are not significant. "
+               if sig else "No difference is significant with one seed and 45 episodes. ")
+            + "A real generalization test needs multi-task training.</p>")
+
     # ---- weights
-    add("<h2>7. Released LoRA weights</h2>")
+    add("<h2>8. Released LoRA weights</h2>")
     add("<p>Adapter-only checkpoints (LoRA + action-row adapters, fp32 safetensors) plus <code>meta.json</code> (codec parameters, normalization statistics, base-model revision). "
         "The frozen base model is downloaded from Hugging Face on load. Stored in git with Git LFS under <code>experiment/adaptive_dwt_vla/weights/</code>.</p>")
     body = []
@@ -486,7 +575,7 @@ def main() -> None:
         else:
             r = pilot_rows.get(f"{v}@pilot_{v}:step_{step:05d}")
         succ = f"{r['successes']}/{r['episodes']}" if r else "–"
-        body.append([f"<code>weights/{esc(name)}</code>", esc(LABEL.get(v, v)), step, f"{d.stat().st_size / 1e6:.1f} MB", succ, f"<code>{sha256(d)[:16]}…</code>"])
+        body.append([f"<code>weights/{esc(name)}</code>", esc(LABEL.get(v, {"dwt_fixed_s4h": "sym4→haar DWT fixed"}.get(v, v))), step, f"{d.stat().st_size / 1e6:.1f} MB", succ, f"<code>{sha256(d)[:16]}…</code>"])
     add(table(["path", "variant", "step", "adapter size", "success (20 eps)", "sha256"], body))
     add("<p>Load one for inference:</p><pre>from lerobot_policy_adaptive_dwt.modeling_adaptive_dwt import load_checkpoint\n"
         "policy, meta = load_checkpoint(\"experiment/adaptive_dwt_vla/weights/lc_s2_dwt_fixed_step_02000\")</pre>")
@@ -514,19 +603,21 @@ def main() -> None:
                           "–" if "op_jerk_ratio" not in b else f"{b['op_jerk_ratio']:.2f}"]
             body.append(cells)
         hdr = ["rank", "transform"] + [c for hz in hzs for c in (f"H{hz} mode", f"H{hz} tokens @FAST", f"H{hz} vs Haar", f"H{hz} jerk ratio")]
-        add("<h2>8. Wavelet choice (offline selection test)</h2>")
-        add(f"<p>All trained models use Haar (db1). An offline test compared {len(names)} transforms (20 standard wavelets and mixed transforms that use a different wavelet "
+        add("<h2>9. Wavelet choice (offline selection test)</h2>")
+        add(f"<p>The main models use Haar (db1). An offline test compared {len(names)} transforms (20 standard wavelets and mixed transforms that use a different wavelet "
             "at each level, each in periodization and symmetric mode) by the coefficient tokens needed to match FAST's reconstruction accuracy on held-out windows. "
             "Top 6 plus common wavelets for reference; full results, rate–distortion curves and basis-shape plots in "
             "<a href='wavelet_selection.html'>wavelet_selection.html</a>.</p>")
         add(table(hdr, body))
         add("<p>Token counts here exclude gripper and structure tokens and use whole-window transforms, so they are not the deployed codec's counts. "
-            "This measures how compactly each transform represents the motion, not how well a policy learns its tokens; none of the alternatives has been trained.</p>")
+            "This measures how compactly each transform represents the motion, not how well a policy learns its tokens. Of the alternatives, only "
+            "sym4→haar has been trained, at 10-step chunks where it has no offline advantage (section 6).</p>")
 
     # ---- caveats
-    add("<h2>9. Caveats</h2><ul>")
+    add("<h2>10. Caveats</h2><ul>")
     for c in [
-        "One task and one instruction. Nothing here says how the tokenizers behave in multi-task training or on other robots.",
+        "One task and one instruction. The zero-shot probe on nine new objects (section 7) mostly fails for every model, so nothing here says how "
+        "the tokenizers behave in multi-task training or on other robots.",
         "20 episodes per checkpoint and 3 seeds: confidence intervals are wide, and the paired tests are not corrected for multiple comparisons.",
         "The FAST baseline learns LIBERO FAST tokens through the same small LoRA budget. Its low value-token accuracy and malformed streams suggest part of the gap is "
         "how hard BPE tokens are to adapt under this recipe; the fully fine-tuned reference shows FAST itself can solve the task. This was tested directly: "
@@ -537,10 +628,12 @@ def main() -> None:
         add(f"<li>{esc(c)}</li>")
     add("</ul>")
 
-    add("<h2>10. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla\n"
+    add("<h2>11. Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla\n"
         "PY=~/miniconda3/envs/smooth-operator-vla/bin/python\n"
         "$PY scripts/prepare_libero.py                 # index + train/val split (downloads lerobot/libero)\n"
         "bash scripts/run_learning_curve.sh 0 1 2      # 9 runs × 2000 steps + checkpoint evals (≈24 h on one A6000)\n"
+        "bash scripts/run_variant.sh dct_fixed 0        # follow-up runs: dwt_fixed_bpe, dct_fixed (seeds 0-2), dwt_fixed_s4h\n"
+        "bash scripts/run_generalization.sh 0 dwt_fixed dwt_fixed_s4h dct_fixed dwt_adaptive   # section 7\n"
         "$PY scripts/write_reports.py codec summary\n"
         "$PY scripts/write_training_report.py          # this file</pre>")
     add("</body></html>")
