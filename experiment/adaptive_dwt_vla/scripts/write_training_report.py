@@ -35,6 +35,8 @@ from lerobot_policy_adaptive_dwt.metrics import wilson_ci  # noqa: E402
 
 VARIANTS = ("fast_matched", "dwt_fixed", "dwt_adaptive", "dct_fixed")
 LABEL = {"fast_matched": "FAST (DCT + BPE)", "dwt_fixed": "DWT fixed plan", "dwt_adaptive": "DWT adaptive", "dct_fixed": "DCT, no BPE (control)"}
+FOLLOW_UPS = (("dwt_fixed_bpe", "Haar DWT fixed + BPE"), ("dwt_fixed_s4h", "sym4→haar DWT fixed"),
+              ("dwt_fixed_lw", "Haar DWT fixed, scale-weighted loss"), ("dwt_fixed_slw", "Haar DWT fixed, soft labels + scale-weighted loss"))
 COLOR = {"fast_matched": "#d9534f", "dwt_fixed": "#2a7ab9", "dwt_adaptive": "#3c9d5d", "dct_fixed": "#e08e0b"}
 SEEDS = (0, 1, 2)
 DASH = {0: "-", 1: "--", 2: ":"}
@@ -290,6 +292,11 @@ def main() -> None:
         add(f"<p>Single-seed follow-ups (section 6): adding BPE to Haar DWT cut success to {fb['successes']}/20, and the mixed sym4→haar wavelet "
             f"reached {fs['successes']}/20 with {fs['tokens_mean']:.0f} tokens per chunk, so neither beats plain Haar at 10-step chunks. "
             "A zero-shot probe on nine new objects (section 7) finds that none of the single-task policies generalizes (0–13% success).</p>")
+    rsl, r0 = rowmap.get(("dwt_fixed_slw", 0, 2000)), rowmap.get(("dwt_fixed", 0, 2000))
+    if rsl and r0:
+        add(f"<p>Changing only the loss on Haar fixed (section 6b): soft labels plus weighting by coefficient scale reached {rsl['successes']}/20 "
+            f"at 2000 steps against {r0['successes']}/20 with plain cross-entropy, same seed and token count. That is promising but not yet "
+            "significant (one seed, 20 episodes), and it learned more slowly early on.</p>")
 
     # ---- setup
     add("<h2>1. What was trained</h2>")
@@ -344,7 +351,7 @@ def main() -> None:
             st, t = r["status"], r["train"][-1]
             body.append([f"<code>lc_s{s}_{v}</code>", esc(LABEL[v]), s, st["step"], f"{st['gpu_hours']:.2f}", hms(st["wall_s"]),
                          f"{st['sec_per_step']:.2f}", f"{t['vram_reserved_gb']:.1f}", f"{t['chunks_seen']:,}", f"{t['action_tokens_seen']:,}"])
-    for v, lab in (("dwt_fixed_bpe", "Haar DWT fixed + BPE (follow-up)"), ("dwt_fixed_s4h", "sym4→haar DWT fixed (follow-up)")):
+    for v, lab in FOLLOW_UPS:
         if (ROOT / "runs" / f"lc_s0_{v}" / "config.json").exists():
             r = load_run(f"lc_s0_{v}")
             st, t = r["status"], r["train"][-1]
@@ -408,7 +415,7 @@ def main() -> None:
                 for i in a.keys() & f_.keys():
                     b += a[i] and not f_[i]
                     c += f_[i] and not a[i]
-            body.append([esc(LABEL[v]), step, b, c, f"{mcnemar_exact(b, c):.3f}"])
+            body.append([esc(LABEL.get(v, dict(FOLLOW_UPS).get(v, v))), step, b, c, f"{mcnemar_exact(b, c):.3f}"])
         return body
 
     add("<h3>Paired test against FAST (same seed, step and initial state; exact McNemar)</h3>")
@@ -433,10 +440,10 @@ def main() -> None:
         if rs:
             body.append([esc(LABEL[v]), num(np.mean([r["tokens_mean"] for r in rs]), 1), num(np.mean([r["latency_ms_mean"] for r in rs]), 0),
                          num(np.mean([r["latency_ms_p95"] for r in rs]), 0)])
-    for v, lab in (("dwt_fixed_bpe", "Haar DWT fixed + BPE (seed 0 only)"), ("dwt_fixed_s4h", "sym4→haar DWT fixed (seed 0 only)")):
+    for v, lab in FOLLOW_UPS:
         r = rowmap.get((v, 0, 2000))
         if r:
-            body.append([esc(lab), num(r["tokens_mean"], 1), num(r["latency_ms_mean"], 0), num(r["latency_ms_p95"], 0)])
+            body.append([esc(lab + " (seed 0 only)"), num(r["tokens_mean"], 1), num(r["latency_ms_mean"], 0), num(r["latency_ms_p95"], 0)])
     add(table(["variant (step 2000, mean over seeds)", "tokens / chunk", "latency ms / chunk", "p95 ms"], body))
     add("<p>Latency is autoregressive generation of one chunk with a KV cache on the A6000. DWT streams are about twice as long as FAST streams, so latency roughly doubles; "
         "at 10 executed actions per chunk this is still within LIBERO's simulated control loop but would need speculative or parallel decoding for real-time control at higher rates.</p>")
@@ -501,6 +508,46 @@ def main() -> None:
         "would bring DWT + BPE to about 29 tokens per chunk at FAST's error (FAST: 25). That run was dropped in favour of the DCT control above; "
         "see the <a href='experiment_trail.html'>experiment trail</a>.</div>")
 
+    lv = [("dwt_fixed", "plain cross-entropy", "#2a7ab9"), ("dwt_fixed_lw", "scale-weighted", "#2ca02c"),
+          ("dwt_fixed_slw", "soft labels + scale-weighted", "#c0392b")]
+    if all(rowmap.get((v, 0, 2000)) for v, _, _ in lv):
+        add("<h3>6b. Follow-up: the loss on Haar DWT fixed (seed 0)</h3>")
+        add("<p>Every run above trains with one-hot cross-entropy, which treats all action tokens alike and every wrong bin alike. Haar is "
+            "orthonormal, so a coefficient error adds its square to the trajectory error (Parseval), and a one-bin miss costs one quantizer step. "
+            "Those steps differ about 30× across levels (0.041–0.119 for the coarsest coefficient, 0.0037–0.0142 for the finest details, which are "
+            "half of the 60 coefficient tokens). Two losses use this, with the same tokens, recipe, seed and decoding as Haar fixed: "
+            "<b>scale-weighted</b> multiplies each coefficient token's cross-entropy by its step, normalized to mean 1 (≈1.8–5.2 for the "
+            "coarsest coefficients, 0.16–0.62 for the finest); <b>soft labels + scale-weighted</b> also replaces the one-hot target by "
+            "q(b) ∝ exp(−((b − b*)·step)² / 2σ²) with σ = 0.007, so a neighbour bin gets real credit at the finest level and almost none at "
+            "the coarsest. Structure and gripper tokens are unchanged, and the logged losses stay plain cross-entropy.</p>")
+        fig, ax = plt.subplots(figsize=(8.5, 4.0))
+        body = []
+        for v, lab, col in lv:
+            rs = {st: rowmap.get((v, 0, st)) for st in steps_fu}
+            xs = [st for st in steps_fu if rs[st]]
+            ax.plot(xs, [rs[st]["successes"] / rs[st]["episodes"] for st in xs], "o-", color=col, lw=2, label=lab)
+            eps = episodes_of(rs[2000])
+            body.append([f"<code>{v}</code>", esc(lab), *[f"{rs[st]['successes']}/{rs[st]['episodes']}" if rs[st] else "–" for st in steps_fu],
+                         num(rs[2000]["tokens_mean"], 1), num(rs[2000]["latency_ms_mean"], 0),
+                         f"{np.mean([e['action_jerk_mean'] for e in eps]):.4f}", f"{rs[2000]['invalid_streams']}/{rs[2000]['chunks']}"])
+        ax.set_xlabel("optimizer step"); ax.set_ylabel("success rate (20 episodes)"); ax.set_ylim(-0.02, 1.02); ax.grid(alpha=0.3)
+        ax.set_title("Seed 0, Haar DWT fixed: loss variants"); ax.legend(fontsize=8, loc="lower right")
+        add(fig_html(fig, "loss variants success vs step"))
+        add(table(["run (seed 0)", "loss", *[f"success @{st}" for st in steps_fu], "tokens / chunk @2000", "latency ms @2000",
+                   "action jerk @2000", "malformed chunks @2000"], body))
+        add("<p>Paired against plain cross-entropy (same seed, step and initial state; exact McNemar):</p>")
+        add(table(["variant", "step", "only this variant succeeds", "only plain succeeds", "p"],
+                  [r for v in ("dwt_fixed_lw", "dwt_fixed_slw") for r in paired(v, "dwt_fixed") if r[1] != 250]))
+        r0, rw, rsl = (rowmap[(v, 0, 2000)] for v, _, _ in lv)
+        add(f"<p><b>Soft labels + weighting reached {rsl['successes']}/20 at 2000 steps</b>, the first perfect score of any trained policy here "
+            f"(plain {r0['successes']}/20, weighted {rw['successes']}/20; plain pooled over three seeds {final['dwt_fixed'][0]}/60). It learned "
+            f"more slowly at first ({', '.join(str(rowmap[('dwt_fixed_slw', 0, st)]['successes']) for st in steps_fu)} of 20 at "
+            f"{', '.join(map(str, steps_fu))} steps; significantly worse than plain at 500 steps), as expected from targets that no longer "
+            "reward the exact bin, and its held-out exact-bin accuracy stays about 2 points below plain. Weighting alone was ahead early "
+            f"({rowmap[('dwt_fixed_lw', 0, 500)]['successes']} vs {rowmap[('dwt_fixed', 0, 500)]['successes']} at 500 steps) but noisier. "
+            "None of the step-2000 differences is significant with 20 episodes and one seed, the token count and latency are unchanged, and "
+            "motion smoothness is about the same. Seeds 1 and 2 would be needed to claim a gain.</p>")
+
     # ---- zero-shot generalization
     gen_rows = [r for r in json.loads((RES / "eval.json").read_text())["rows"]
                 if r["task"] != TRAIN_TASK and re.match(r"^\w+@lc_s0_\w+:step_02000$", r["model"])]
@@ -510,8 +557,10 @@ def main() -> None:
             "on the other nine <code>libero_object</code> tasks: the same scene type and basket, a different object to pick up, and the new instruction "
             "in the prompt. Five initial states per task were drawn at random (seed 0) from states 0–19, a different draw per task and the same "
             "states for every model; 45 episodes per model. Nothing was trained on these tasks.</p>")
-        gv = [v for v in ("dwt_fixed", "dwt_fixed_s4h", "dct_fixed", "dwt_adaptive") if any(r["model"].startswith(v + "@") for r in gen_rows)]
-        glabel = {"dwt_fixed": "Haar DWT fixed", "dwt_fixed_s4h": "sym4→haar DWT fixed", "dct_fixed": "DCT, no BPE", "dwt_adaptive": "Haar DWT adaptive"}
+        gv = [v for v in ("dwt_fixed", "dwt_fixed_lw", "dwt_fixed_slw", "dwt_fixed_s4h", "dct_fixed", "dwt_adaptive")
+              if any(r["model"].startswith(v + "@") for r in gen_rows)]
+        glabel = {"dwt_fixed": "Haar DWT fixed", "dwt_fixed_lw": "Haar fixed, weighted loss", "dwt_fixed_slw": "Haar fixed, soft + weighted loss",
+                  "dwt_fixed_s4h": "sym4→haar DWT fixed", "dct_fixed": "DCT, no BPE", "dwt_adaptive": "Haar DWT adaptive"}
         by = {(r["model"].split("@")[0], r["task"]): r for r in gen_rows}
         tasks = sorted({r["task"] for r in gen_rows}, key=lambda t: int(t.split("#")[1]))
         obj = {r["task"]: re.sub(r"^pick up the (.*) and place it in the basket$", r"\1", r["instruction"]) for r in gen_rows}
@@ -552,8 +601,9 @@ def main() -> None:
         add(f"<p>All models fail almost everywhere: every success of every model is on {' or '.join(esc(obj[t]) for t in hit)}, and the "
             "successful episodes are about as long as a successful alphabet-soup episode (≈145 steps). The likeliest reading is that the policies "
             "replay the motion learned on the training task and succeed where the named object happens to be reachable that way, rather than "
-            "following the new instruction; no videos were recorded, so this is not confirmed. The ranking matches the training task "
-            "(Haar fixed highest, adaptive lowest). "
+            "following the new instruction; no videos were recorded, so this is not confirmed. Roughly as on the training task, the Haar "
+            "fixed policies lead and adaptive is lowest, but the loss changes do not carry over: soft labels + weighting, best on the training "
+            "task, scores the same as plain cross-entropy here, and the three Haar fixed losses are within one episode of each other. "
             + (f"Haar fixed beats {', '.join(sig)} in the paired test (uncorrected, one seed); the other differences are not significant. "
                if sig else "No difference is significant with one seed and 45 episodes. ")
             + "A real generalization test needs multi-task training.</p>")
@@ -575,7 +625,7 @@ def main() -> None:
         else:
             r = pilot_rows.get(f"{v}@pilot_{v}:step_{step:05d}")
         succ = f"{r['successes']}/{r['episodes']}" if r else "–"
-        body.append([f"<code>weights/{esc(name)}</code>", esc(LABEL.get(v, {"dwt_fixed_s4h": "sym4→haar DWT fixed"}.get(v, v))), step, f"{d.stat().st_size / 1e6:.1f} MB", succ, f"<code>{sha256(d)[:16]}…</code>"])
+        body.append([f"<code>weights/{esc(name)}</code>", esc(LABEL.get(v, dict(FOLLOW_UPS).get(v, v))), step, f"{d.stat().st_size / 1e6:.1f} MB", succ, f"<code>{sha256(d)[:16]}…</code>"])
     add(table(["path", "variant", "step", "adapter size", "success (20 eps)", "sha256"], body))
     add("<p>Load one for inference:</p><pre>from lerobot_policy_adaptive_dwt.modeling_adaptive_dwt import load_checkpoint\n"
         "policy, meta = load_checkpoint(\"experiment/adaptive_dwt_vla/weights/lc_s2_dwt_fixed_step_02000\")</pre>")
@@ -632,8 +682,8 @@ def main() -> None:
         "PY=~/miniconda3/envs/smooth-operator-vla/bin/python\n"
         "$PY scripts/prepare_libero.py                 # index + train/val split (downloads lerobot/libero)\n"
         "bash scripts/run_learning_curve.sh 0 1 2      # 9 runs × 2000 steps + checkpoint evals (≈24 h on one A6000)\n"
-        "bash scripts/run_variant.sh dct_fixed 0        # follow-up runs: dwt_fixed_bpe, dct_fixed (seeds 0-2), dwt_fixed_s4h\n"
-        "bash scripts/run_generalization.sh 0 dwt_fixed dwt_fixed_s4h dct_fixed dwt_adaptive   # section 7\n"
+        "bash scripts/run_variant.sh dct_fixed 0        # follow-up runs: dwt_fixed_bpe, dct_fixed (seeds 0-2), dwt_fixed_s4h, dwt_fixed_lw, dwt_fixed_slw\n"
+        "bash scripts/run_generalization.sh 0 dwt_fixed dwt_fixed_s4h dct_fixed dwt_adaptive dwt_fixed_lw dwt_fixed_slw   # section 7\n"
         "$PY scripts/write_reports.py codec summary\n"
         "$PY scripts/write_training_report.py          # this file</pre>")
     add("</body></html>")

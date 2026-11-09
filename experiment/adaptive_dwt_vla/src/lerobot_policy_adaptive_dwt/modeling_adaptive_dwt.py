@@ -30,15 +30,42 @@ from .adapters import adapter_state_dict, attach_adapters, load_adapter_state_di
 from .bpe import load_codec
 from .codec import AdaptiveDWTCodec
 from .configuration_adaptive_dwt import AdaptiveDWTConfig
+from .codec_basis import group_of
 from .processor_adaptive_dwt import ACTION_PREFIX_TEXT, local_to_pali, pali_to_local
-from .token_grammar import GrammarError
+from .token_grammar import LEN_VALUES, GrammarError
 
 BASE_CHECKPOINT = "lerobot/pi0fast-base"
 BASE_REVISION = "308eb844dabdf46cd9dcd5138c1988b7a234f1d9"
 
 
 # --------------------------------------------------------------------------- training loss
-def token_forward(policy, batch) -> dict:
+def coef_targets(targets: torch.Tensor, codec: AdaptiveDWTCodec) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per shifted target position: quantization bin (-1 if not a coefficient token) and the quantizer step of
+    that coefficient (its segment length, wavelet group and dimension; 0 elsewhere). Segment codec only."""
+    v, q, n_cont = codec.vocab, codec.quantizer, codec.spec.n_cont
+    local = pali_to_local(targets.cpu().numpy())
+    bins = np.full(local.shape, -1, dtype=np.int64)
+    steps = np.zeros(local.shape, dtype=np.float32)
+    for b in range(local.shape[0]):
+        length, k = 0, 0
+        for t, tok in enumerate(local[b]):
+            cls = v.token_class(int(tok)) if 0 <= tok < v.size else "invalid"
+            if cls == "len":
+                length, k = LEN_VALUES[int(tok) - v.len_offset], 0
+            elif cls == "coef" and length:
+                c, d = divmod(k, n_cont)
+                steps[b, t] = q.params[length][1][group_of(length)[c], d]
+                bins[b, t] = int(tok)
+                k += 1
+    return torch.from_numpy(bins).to(targets.device), torch.from_numpy(steps).to(targets.device)
+
+
+def token_forward(policy, batch, codec=None, coef_weight: bool = False, soft_sigma: float = 0.0) -> dict:
+    """``coef_weight``: weight each coefficient token's loss by its quantizer step (normalized to mean 1 over the
+    coefficient tokens of the batch), i.e. by the trajectory error a one-bin miss causes under the orthonormal Haar
+    basis. ``soft_sigma`` > 0: coefficient tokens get a discretized-Gaussian target over neighbouring bins,
+    q(b) ∝ exp(-((b - b*) step)² / 2σ²), σ in normalized action units. ``per_token`` is always the plain one-hot
+    cross-entropy, so logged train/val losses stay comparable with the baseline."""
     model = policy.model
     images, img_masks = policy._preprocess_images(batch)
     act_tokens = batch[ACTION_TOKENS]
@@ -59,10 +86,34 @@ def token_forward(policy, batch) -> dict:
     logits = pg.paligemma.lm_head(hidden)[:, :-1, :]  # position i predicts token i+1
     targets = act_tokens[:, 1:]
     mask = act_masks[:, 1:]
-    per_tok = F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), targets.reshape(-1), reduction="none")
-    per_tok = per_tok.reshape(targets.shape)
-    loss = (per_tok * mask).sum() / mask.sum().clamp(min=1)
+    loss, per_tok = action_token_loss(logits, targets, mask, codec, coef_weight, soft_sigma)
     return {"loss": loss, "per_token": per_tok.detach(), "pred": logits.detach().argmax(-1), "targets": targets, "mask": mask}
+
+
+def action_token_loss(logits, targets, mask, codec=None, coef_weight: bool = False, soft_sigma: float = 0.0):
+    """Returns (training loss, plain one-hot cross-entropy per position); see ``token_forward``."""
+    flat = logits.float()
+    per_tok = F.cross_entropy(flat.reshape(-1, flat.shape[-1]), targets.reshape(-1), reduction="none")
+    per_tok = per_tok.reshape(targets.shape)
+    train_tok = per_tok
+    if codec is not None and (coef_weight or soft_sigma > 0):
+        bins, steps = coef_targets(targets, codec)
+        is_coef = (bins >= 0) & mask.bool()
+        if soft_sigma > 0 and is_coef.any():
+            n_bins = codec.vocab.n_bins
+            coef_ids = torch.as_tensor(local_to_pali(np.arange(n_bins)), device=flat.device)
+            sel = flat[is_coef]  # (N, V)
+            logp = sel[:, coef_ids] - torch.logsumexp(sel, dim=-1, keepdim=True)  # (N, n_bins) log-probs of the bins
+            del sel
+            delta = torch.arange(n_bins, device=flat.device)[None, :] - bins[is_coef][:, None]
+            q = torch.softmax(-((delta * steps[is_coef][:, None]) ** 2) / (2 * soft_sigma**2), dim=-1)
+            train_tok = train_tok.clone()
+            train_tok[is_coef] = -(q * logp).sum(-1)
+        if coef_weight and is_coef.any():
+            w = torch.ones_like(train_tok)
+            w[is_coef] = steps[is_coef] / steps[is_coef].mean()
+            train_tok = train_tok * w
+    return (train_tok * mask).sum() / mask.sum().clamp(min=1), per_tok
 
 
 def classify_targets(targets: torch.Tensor, variant: str, codec: AdaptiveDWTCodec | None, prefix_ids: list[int],

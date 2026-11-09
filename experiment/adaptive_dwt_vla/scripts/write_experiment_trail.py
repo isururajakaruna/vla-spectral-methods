@@ -181,7 +181,7 @@ def build_nodes():
              "The learning curve confirmed the result, so the trained adapters were published to make it reproducible.",
              "What was released?",
              [("What is in git", f"LoRA + row-adapter weights only (Git LFS), {n_w} final checkpoints: 9 learning-curve runs, 3 pilots, then the "
-               "follow-up step-2000 checkpoints (DCT without BPE × 3 seeds, sym4→haar). "
+               "follow-up step-2000 checkpoints (DCT without BPE × 3 seeds, sym4→haar, Haar fixed with the weighted and soft + weighted losses). "
                "The base model is not included; it is downloaded from Hugging Face."),
               ("Trained on", OUR_DATA)],
              f"{n_w} adapter checkpoints with SHA-256 sums and an HTML training report.", link="training_report.html", short=f"{n_w} checkpoints on git (LFS)")
@@ -336,7 +336,8 @@ def build_nodes():
     gen = [r for r in (jload(RES / "eval.json") or {"rows": []})["rows"]
            if r["task"] != "libero_object#0" and re.match(r"^\w+@lc_s0_\w+:step_02000$", r["model"])]
     if gen:
-        gl = {"dwt_fixed": "Haar fixed", "dwt_fixed_s4h": "sym4→haar fixed", "dct_fixed": "DCT no BPE", "dwt_adaptive": "Haar adaptive"}
+        gl = {"dwt_fixed": "Haar fixed", "dwt_fixed_s4h": "sym4→haar fixed", "dct_fixed": "DCT no BPE", "dwt_adaptive": "Haar adaptive",
+              "dwt_fixed_lw": "Haar fixed, weighted loss", "dwt_fixed_slw": "Haar fixed, soft + weighted loss"}
         tot = {}
         for r in gen:
             v = r["model"].split("@")[0]
@@ -350,16 +351,78 @@ def build_nodes():
              "Every policy was trained on one instruction only, so its training-task score says nothing about whether the token format "
              "helps it handle new instructions. Probe that cheaply with the existing checkpoints before considering multi-task training.",
              "Do the single-task policies transfer to new objects in the same scene, and does the token format matter there?",
-             [("Models", "The seed-0, step-2000 checkpoints of Haar fixed, Haar adaptive, DCT without BPE and sym4→haar fixed. No new training."),
+             [("Models", "The seed-0, step-2000 checkpoints of Haar fixed, Haar adaptive, DCT without BPE and sym4→haar fixed, "
+              "later also Haar fixed with the weighted and soft + weighted losses. No new training."),
               ("Trained on", OUR_DATA),
               ("Evaluation", "The other nine libero_object tasks (#1–#9: same scene and basket, a different object and instruction), never seen in "
                "training. 5 initial states per task drawn at random (seed 0) from 0–19, the same states for every model.")],
              res, "The successes take about as long as an alphabet-soup success: the policies most likely replay the learned motion and succeed "
              "where the new object happens to be reachable that way, rather than following the instruction (no videos to confirm). "
-             "The ranking matches the training task. Only Haar fixed vs Haar adaptive is significant in a paired test (6 vs 0 episodes "
-             "won alone, p = 0.03 uncorrected); Haar vs DCT (p = 0.22) and Haar vs sym4→haar (p = 0.73) are not. Seeds 1–2 were not run. "
+             "The Haar fixed policies lead and adaptive is lowest, as on the training task, but the loss variants do not carry over: soft labels + "
+             "weighting (20/20 on the training task) ties plain cross-entropy here and weighting alone is one episode ahead (both p = 1.0). "
+             "Only Haar fixed vs Haar adaptive is significant in a paired test (6 vs 0 episodes won alone, p = 0.03 uncorrected); Haar vs "
+             "DCT (p = 0.22) and Haar vs sym4→haar (p = 0.73) are not. Seeds 1–2 were not run. "
              "Real generalization needs multi-task training.",
              short=f"≈0%: best {gl.get(best, best)} {tot[best][0]}/{tot[best][1]}", link="training_report.html")
+    def loss_run(variant):
+        name = f"lc_s0_{variant}"
+        st, s = run_status(name)
+        ev = {step: by_model.get(f"{variant}@{name}:step_{step:05d}") for step in steps}
+        hf = {step: by_model.get(f"dwt_fixed@lc_s0_dwt_fixed:step_{step:05d}") for step in steps}
+        seq = lambda d: ", ".join(f"{step}: {r['successes']}/20" for step, r in d.items() if r)  # noqa: E731
+        if st == "planned":
+            return st, "Queued.", "queued"
+        if not any(ev.values()):
+            res = f"Training: step {s.get('step', 0)} / {s.get('stop_at', 2000)}." if st == "running" and s else "Training done; evaluation pending."
+            return ("failed" if st == "failed" else "running"), res, "running"
+        res = (f"Success, seed 0: {seq(ev)}. Plain-loss Haar fixed, same seed: {seq(hf)}."
+               + (f" Malformed chunks at 2,000 steps: {ev[2000]['invalid_streams']}/{ev[2000]['chunks']}." if ev[2000] else ""))
+        done = bool(ev[2000])
+        return ("done" if done else "running"), res, (f"{ev[2000]['successes']}/20 @2k vs plain {hf[2000]['successes']}/20" if done else "evaluating")
+
+    loss_setup = lambda loss: [  # noqa: E731
+        ("Base model", BASE),
+        ("Training data", OUR_DATA),
+        ("Training", lora("Seed 0, same recipe as the learning curve (5,000-step schedule stopped at 2,000 steps)")),
+        ("Tokens", "Fixed-plan Haar DWT (8+2 segments, 69 tokens per chunk), exactly as lc_s0_dwt_fixed; inference and decoding unchanged."),
+        ("Loss", loss),
+        ("Compared with", "lc_s0_dwt_fixed: same tokens, seed and recipe, plain one-hot cross-entropy."),
+        ("Evaluation", EVAL + " Every checkpoint (250–2,000 steps).")]
+    st, res, short = loss_run("dwt_fixed_lw")
+    node("LW", "LC", "Loss weighted by coefficient scale (Haar fixed)", st,
+         "Every run so far trained with plain cross-entropy, which scores each action token as right or wrong and treats all tokens and all "
+         "wrong bins alike. For wavelet tokens that ignores what the token means. The Haar basis is orthonormal, so by Parseval a coefficient "
+         "error adds exactly its square to the squared trajectory error, and a one-bin miss costs one quantizer step. Those steps differ by "
+         "about 30× across levels: 0.041–0.119 for the coarsest Level-8 coefficient (the chunk's average motion), down to 0.0037–0.0142 for "
+         "the finest details, which are half of the 60 coefficient tokens. So the loss spends half its gradient on tokens whose mistakes "
+         "barely move the arm, and as much on a trajectory-ruining coarse miss as on an invisible fine one. Our failures fit this: BPE and "
+         "FAST lost mostly through sloppy or malformed tokens, and the jerk measurements show output detail matters. Haar fixed is the best "
+         "format, so it is the one to improve. Related work: FreqPolicy (arXiv 2506.08822) and FreDF (ICLR 2025) weight losses by frequency, "
+         "but on continuous outputs; FreqPolicy-AR (2506.01583), MINT and Wavelet Policy (2507.04331) tokenize or predict frequency/wavelet "
+         "bands with plain losses. We found no work weighting the token loss of discrete wavelet-coefficient tokens in a VLA by the error each "
+         "token causes.",
+         "Does weighting each coefficient token's loss by the trajectory error a miss would cause make Haar fixed learn faster or better?",
+         loss_setup("Coefficient-token cross-entropy × w, with w = quantizer step of that coefficient (its segment, level and dimension) divided "
+                    "by the mean step over the batch's coefficient tokens. Coarsest coefficients get w ≈ 1.8–5.2, finest details 0.16–0.62. "
+                    "Structure and gripper tokens keep weight 1. The logged train/val loss is still the plain cross-entropy, so curves stay comparable."),
+         res, "Weighting changes how much each token counts but still rewards only the exact bin; the soft-label child adds credit for near "
+         "misses. One seed, a probe: a clear gap either way would justify more seeds.", short=short)
+    st, res, short = loss_run("dwt_fixed_slw")
+    node("SLW", "LW", "Soft labels + scale weighting (Haar fixed)", st,
+         "Weighting fixes how much each token counts, but one-hot cross-entropy still treats a prediction one bin off exactly like one 200 "
+         "bins off, although the bins are ordered values and a neighbour bin is a nearly correct answer. Soft labels give partial credit "
+         "to bins close in value. Using the quantizer step to measure closeness makes them follow the same Parseval logic as the weights: "
+         "a fine-level neighbour is only ≈0.004–0.014 off and should get real credit, while a coarse-level neighbour is 0.04–0.12 off and "
+         "should get almost none. Gaussian soft labels over discretized actions are used by ActionMap (arXiv 2606.06904) in a VLA action "
+         "head, and distance-aware soft targets for ordered tokens by DIST² (arXiv 2503.02379), HL-Gauss (Farebrother et al. 2024) and "
+         "ordinal-regression losses (DORN, squared EMD). None scale the label width by wavelet level. Run on top of weighting so the "
+         "difference from the LW node isolates the soft labels.",
+         "Do step-aware soft labels add anything on top of scale weighting?",
+         loss_setup("As the weighted node, plus a soft target on each coefficient token: q(b) ∝ exp(−((b − b*)·step)² / 2σ²) over its 256 bins, "
+                    "σ = 0.007 in normalized action units (about the median finest-level step). A neighbour bin gets 13–87% of the target's "
+                    "probability at the finest level, up to 65% one level coarser, at most 20% at the next, and ≈0 at the coarsest. Loss = "
+                    "−Σ q log p over the bins; structure and gripper tokens stay one-hot."),
+         res, "σ was set from the step table, not tuned. One seed.", short=short)
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",

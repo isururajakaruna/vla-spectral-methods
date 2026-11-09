@@ -3,7 +3,9 @@
 Variants: fast_matched (FAST libero tokenizer), dwt_fixed, dwt_adaptive, dwt_{fixed,adaptive}_bpe (BPE over the coefficients of the fixed / oracle plans),
 dwt_{fixed,adaptive}_s4h[_bpe] (whole-window sym4→haar DWT, symmetric mode; fixed = full depth, adaptive = per-chunk depth),
 dwt_fixed_compact[_bpe] (fixed plan without per-segment structure tokens; see --detail-scale/--deadzone),
-dct_fixed (whole-chunk DCT-II, full resolution, same quantizer/grammar as DWT, no BPE). Same data, images, state,
+dct_fixed (whole-chunk DCT-II, full resolution, same quantizer/grammar as DWT, no BPE),
+dwt_fixed_lw / dwt_fixed_slw (dwt_fixed tokens; coefficient-token loss weighted by quantizer step / plus soft labels,
+see token_forward). Same data, images, state,
 prompt, normalization (training-split stats), horizon, optimizer schedule and effective batch.
 
 Run directory runs/<name>/:
@@ -49,7 +51,10 @@ def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--variant", required=True, choices=["fast_matched", "dwt_fixed", "dwt_adaptive", "dwt_fixed_bpe", "dwt_adaptive_bpe", "dwt_fixed_s4h", "dwt_adaptive_s4h",
                                                        "dwt_fixed_s4h_bpe", "dwt_adaptive_s4h_bpe",
-                                                       "dwt_fixed_compact", "dwt_fixed_compact_bpe", "dct_fixed"])
+                                                       "dwt_fixed_compact", "dwt_fixed_compact_bpe", "dct_fixed",
+                                                       "dwt_fixed_lw", "dwt_fixed_slw"])
+    ap.add_argument("--soft-sigma", type=float, default=0.007,
+                    help="dwt_fixed_slw: soft-label width in normalized action units (coefficient error)")
     ap.add_argument("--name", required=True)
     ap.add_argument("--tasks", type=int, nargs="+", default=[24])
     ap.add_argument("--horizon", type=int, default=10)
@@ -232,6 +237,8 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
     val_loader = torch.utils.data.DataLoader(val_ds, batch_size=args.micro_batch, shuffle=False, num_workers=2)
 
     tok = policy._paligemma_tokenizer
+    loss_kw = dict(codec=codec, coef_weight=args.variant in ("dwt_fixed_lw", "dwt_fixed_slw"),
+                   soft_sigma=args.soft_sigma if args.variant == "dwt_fixed_slw" else 0.0)
     prefix_ids = tok.encode("Action: ", add_special_tokens=False)
     bar_id = tok.convert_tokens_to_ids("|")
     params = [p for p in policy.parameters() if p.requires_grad]
@@ -266,6 +273,7 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
         "empty_cameras": args.empty_cameras,
         "lora_rank": args.lora_rank, "lora_alpha": args.lora_alpha, "fixed_plan": fixed_plan, "oracle_gamma": gamma,
         "codec": codec.to_dict() if codec else None, "norm_stats": stats, "fallback_normalized": fallback.tolist(),
+        "loss": {"coef_weight": loss_kw["coef_weight"], "soft_sigma": loss_kw["soft_sigma"]},
         "action_tokenizer": cfg.action_tokenizer_name if args.variant == "fast_matched" else None,
         "base_checkpoint": "lerobot/pi0fast-base@308eb844dabdf46cd9dcd5138c1988b7a234f1d9",
         "dataset": f"{REPO}@{REVISION}",
@@ -279,7 +287,7 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
         "counts": counts, "bpe": bpe_stats, "model_load_s": t_load, "git": git_rev(), "gpu": torch.cuda.get_device_name(0),
         "versions": {"python": platform.python_version(), "torch": torch.__version__, "lerobot": lerobot.__version__,
                      "transformers": transformers.__version__},
-        "effective_batch": args.micro_batch * args.grad_accum, **{k: meta_base[k] for k in ("base_checkpoint", "dataset", "oracle_gamma", "fixed_plan")},
+        "effective_batch": args.micro_batch * args.grad_accum, **{k: meta_base[k] for k in ("base_checkpoint", "dataset", "oracle_gamma", "fixed_plan", "loss")},
     }
     (run / "config.json").write_text(json.dumps(run_cfg, indent=1))
     print(json.dumps({k: run_cfg[k] for k in ("n_train_windows", "n_val_windows", "counts", "effective_batch")}), flush=True)
@@ -348,7 +356,7 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
             td = time.time()
             batch = pre(next(it))
             t_data += time.time() - td
-            out = token_forward(policy, batch)
+            out = token_forward(policy, batch, **loss_kw)
             (out["loss"] / args.grad_accum).backward()
             tokens_seen += class_stats(out, acc_win)
             chunks_seen += args.micro_batch

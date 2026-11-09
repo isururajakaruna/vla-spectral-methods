@@ -105,8 +105,9 @@ loss, throughput, evaluation table with Wilson intervals, codec tables, result p
 
 ## Released weights and training report
 
-`weights/<run>_step_XXXXX/` holds the final adapter checkpoint of every learning-curve run (step 2000) and pilot
-run (step 5000): `adapters.safetensors` (LoRA + action-row adapters, Git LFS) and `meta.json` (codec, norm stats,
+`weights/<run>_step_XXXXX/` holds the final adapter checkpoint of every learning-curve run (step 2000), pilot
+run (step 5000) and step-2000 follow-up (DCT without BPE, sym4→haar, and the `dwt_fixed_lw` / `dwt_fixed_slw` loss
+variants, which train the same Haar tokens with `--soft-sigma` soft labels and/or quantizer-step weighting): `adapters.safetensors` (LoRA + action-row adapters, Git LFS) and `meta.json` (codec, norm stats,
 base-model revision). Run `git lfs install && git lfs pull` after cloning, then load with
 `load_checkpoint("weights/lc_s2_dwt_fixed_step_02000")`; the frozen base model comes from Hugging Face.
 
