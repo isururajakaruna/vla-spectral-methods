@@ -144,6 +144,7 @@ def main() -> None:
     ap.add_argument("--sample-seed", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=0, help="0 = suite default")
     ap.add_argument("--videos", type=int, default=2, help="record the first N episodes per model/task")
+    ap.add_argument("--label-prefix", default="", help="prepended to the model label, so a separate protocol does not overwrite earlier results")
     args = ap.parse_args()
 
     from lerobot.envs.factory import make_env_pre_post_processors
@@ -157,6 +158,7 @@ def main() -> None:
     summary_path = ROOT / "results" / "eval.json"
     for spec in args.models:
         label, predict, cfg, telemetry, n_exec = load_model(spec)
+        label = args.label_prefix + label
         scene = LiberoScene()
         for task_id in args.task_ids:
             instruction = catalog["tasks"][task_id]["language"]

@@ -292,11 +292,13 @@ def main() -> None:
         add(f"<p>Single-seed follow-ups (section 6): adding BPE to Haar DWT cut success to {fb['successes']}/20, and the mixed sym4→haar wavelet "
             f"reached {fs['successes']}/20 with {fs['tokens_mean']:.0f} tokens per chunk, so neither beats plain Haar at 10-step chunks. "
             "A zero-shot probe on nine new objects (section 7) finds that none of the single-task policies generalizes (0–13% success).</p>")
-    rsl, r0 = rowmap.get(("dwt_fixed_slw", 0, 2000)), rowmap.get(("dwt_fixed", 0, 2000))
-    if rsl and r0:
-        add(f"<p>Changing only the loss on Haar fixed (section 6b): soft labels plus weighting by coefficient scale reached {rsl['successes']}/20 "
-            f"at 2000 steps against {r0['successes']}/20 with plain cross-entropy, same seed and token count. That is promising but not yet "
-            "significant (one seed, 20 episodes), and it learned more slowly early on.</p>")
+    ss = [s for s in SEEDS if ("dwt_fixed_slw", s, 2000) in rowmap]
+    if ss:
+        k_s = sum(rowmap[("dwt_fixed_slw", s, 2000)]["successes"] for s in ss)
+        k_p = sum(rowmap[("dwt_fixed", s, 2000)]["successes"] for s in ss)
+        add(f"<p>Changing only the loss on Haar fixed (section 6b): soft labels plus weighting by coefficient scale reached {k_s}/{20 * len(ss)} "
+            f"at 2000 steps over {len(ss)} seed(s) against {k_p}/{20 * len(ss)} with plain cross-entropy, same token count: no significant "
+            "difference, and slower learning in mid-training.</p>")
 
     # ---- setup
     add("<h2>1. What was trained</h2>")
@@ -511,7 +513,7 @@ def main() -> None:
     lv = [("dwt_fixed", "plain cross-entropy", "#2a7ab9"), ("dwt_fixed_lw", "scale-weighted", "#2ca02c"),
           ("dwt_fixed_slw", "soft labels + scale-weighted", "#c0392b")]
     if all(rowmap.get((v, 0, 2000)) for v, _, _ in lv):
-        add("<h3>6b. Follow-up: the loss on Haar DWT fixed (seed 0)</h3>")
+        add("<h3>6b. Follow-up: the loss on Haar DWT fixed</h3>")
         add("<p>Every run above trains with one-hot cross-entropy, which treats all action tokens alike and every wrong bin alike. Haar is "
             "orthonormal, so a coefficient error adds its square to the trajectory error (Parseval), and a one-bin miss costs one quantizer step. "
             "Those steps differ about 30× across levels (0.041–0.119 for the coarsest coefficient, 0.0037–0.0142 for the finest details, which are "
@@ -519,34 +521,46 @@ def main() -> None:
             "<b>scale-weighted</b> multiplies each coefficient token's cross-entropy by its step, normalized to mean 1 (≈1.8–5.2 for the "
             "coarsest coefficients, 0.16–0.62 for the finest); <b>soft labels + scale-weighted</b> also replaces the one-hot target by "
             "q(b) ∝ exp(−((b − b*)·step)² / 2σ²) with σ = 0.007, so a neighbour bin gets real credit at the finest level and almost none at "
-            "the coarsest. Structure and gripper tokens are unchanged, and the logged losses stay plain cross-entropy.</p>")
+            "the coarsest. Structure and gripper tokens are unchanged, and the logged losses stay plain cross-entropy. "
+            "Soft labels + weighting was run with seeds 0–2, weighting alone with seed 0 only.</p>")
+        seeds_of = lambda v: [s for s in SEEDS if (v, s, 2000) in rowmap]  # noqa: E731
         fig, ax = plt.subplots(figsize=(8.5, 4.0))
         body = []
         for v, lab, col in lv:
-            rs = {st: rowmap.get((v, 0, st)) for st in steps_fu}
-            xs = [st for st in steps_fu if rs[st]]
-            ax.plot(xs, [rs[st]["successes"] / rs[st]["episodes"] for st in xs], "o-", color=col, lw=2, label=lab)
-            eps = episodes_of(rs[2000])
-            body.append([f"<code>{v}</code>", esc(lab), *[f"{rs[st]['successes']}/{rs[st]['episodes']}" if rs[st] else "–" for st in steps_fu],
-                         num(rs[2000]["tokens_mean"], 1), num(rs[2000]["latency_ms_mean"], 0),
-                         f"{np.mean([e['action_jerk_mean'] for e in eps]):.4f}", f"{rs[2000]['invalid_streams']}/{rs[2000]['chunks']}"])
-        ax.set_xlabel("optimizer step"); ax.set_ylabel("success rate (20 episodes)"); ax.set_ylim(-0.02, 1.02); ax.grid(alpha=0.3)
-        ax.set_title("Seed 0, Haar DWT fixed: loss variants"); ax.legend(fontsize=8, loc="lower right")
+            ss = seeds_of(v)
+            ks = {st: (sum(rowmap[(v, s, st)]["successes"] for s in ss if (v, s, st) in rowmap),
+                       sum(rowmap[(v, s, st)]["episodes"] for s in ss if (v, s, st) in rowmap)) for st in steps_fu}
+            ax.plot(steps_fu, [k / n for k, n in ks.values()], "o-", color=col, lw=2, label=f"{lab} ({len(ss)} seed{'s' if len(ss) > 1 else ''})")
+            jerk = np.mean([np.mean([e["action_jerk_mean"] for e in episodes_of(rowmap[(v, s, 2000)])]) for s in ss])
+            body.append([f"<code>{v}</code>", esc(lab), ", ".join(map(str, ss)), *[f"{k}/{n}" for k, n in ks.values()],
+                         num(np.mean([rowmap[(v, s, 2000)]["tokens_mean"] for s in ss]), 1),
+                         num(np.mean([rowmap[(v, s, 2000)]["latency_ms_mean"] for s in ss]), 0), f"{jerk:.4f}",
+                         f"{sum(rowmap[(v, s, 2000)]['invalid_streams'] for s in ss)}/{sum(rowmap[(v, s, 2000)]['chunks'] for s in ss)}"])
+        ax.set_xlabel("optimizer step"); ax.set_ylabel("success rate (pooled over seeds)"); ax.set_ylim(-0.02, 1.02); ax.grid(alpha=0.3)
+        ax.set_title("Haar DWT fixed: loss variants"); ax.legend(fontsize=8, loc="lower right")
         add(fig_html(fig, "loss variants success vs step"))
-        add(table(["run (seed 0)", "loss", *[f"success @{st}" for st in steps_fu], "tokens / chunk @2000", "latency ms @2000",
+        add(table(["run", "loss", "seeds", *[f"success @{st}" for st in steps_fu], "tokens / chunk @2000", "latency ms @2000",
                    "action jerk @2000", "malformed chunks @2000"], body))
-        add("<p>Paired against plain cross-entropy (same seed, step and initial state; exact McNemar):</p>")
+        per_seed = [[f"<code>{v}</code>", s, *[f"{rowmap[(v, s, st)]['successes']}/20" if (v, s, st) in rowmap else "–" for st in steps_fu]]
+                    for v in ("dwt_fixed", "dwt_fixed_slw") for s in seeds_of(v)]
+        add("<p>Per seed:</p>" + table(["run", "seed", *[f"@{st}" for st in steps_fu]], per_seed))
+        add("<p>Paired against plain cross-entropy (same seed, step and initial state, pooled over the seeds each variant has; exact McNemar):</p>")
+        pr = {v: paired(v, "dwt_fixed") for v in ("dwt_fixed_lw", "dwt_fixed_slw")}
         add(table(["variant", "step", "only this variant succeeds", "only plain succeeds", "p"],
-                  [r for v in ("dwt_fixed_lw", "dwt_fixed_slw") for r in paired(v, "dwt_fixed") if r[1] != 250]))
-        r0, rw, rsl = (rowmap[(v, 0, 2000)] for v, _, _ in lv)
-        add(f"<p><b>Soft labels + weighting reached {rsl['successes']}/20 at 2000 steps</b>, the first perfect score of any trained policy here "
-            f"(plain {r0['successes']}/20, weighted {rw['successes']}/20; plain pooled over three seeds {final['dwt_fixed'][0]}/60). It learned "
-            f"more slowly at first ({', '.join(str(rowmap[('dwt_fixed_slw', 0, st)]['successes']) for st in steps_fu)} of 20 at "
-            f"{', '.join(map(str, steps_fu))} steps; significantly worse than plain at 500 steps), as expected from targets that no longer "
-            "reward the exact bin, and its held-out exact-bin accuracy stays about 2 points below plain. Weighting alone was ahead early "
-            f"({rowmap[('dwt_fixed_lw', 0, 500)]['successes']} vs {rowmap[('dwt_fixed', 0, 500)]['successes']} at 500 steps) but noisier. "
-            "None of the step-2000 differences is significant with 20 episodes and one seed, the token count and latency are unchanged, and "
-            "motion smoothness is about the same. Seeds 1 and 2 would be needed to claim a gain.</p>")
+                  [r for v in pr for r in pr[v] if r[1] != 250]))
+        ss = seeds_of("dwt_fixed_slw")
+        k_s = sum(rowmap[("dwt_fixed_slw", s, 2000)]["successes"] for s in ss)
+        k_p = sum(rowmap[("dwt_fixed", s, 2000)]["successes"] for s in ss)
+        p2k = next(r for r in pr["dwt_fixed_slw"] if r[1] == 2000)
+        add(f"<p><b>Neither loss beats plain cross-entropy.</b> Soft labels + weighting reached {k_s}/{20 * len(ss)} at 2000 steps over "
+            f"{len(ss)} seeds against {k_p}/{20 * len(ss)} for plain (paired: {p2k[2]} episodes won only by soft labels, {p2k[3]} only by plain, "
+            f"p = {p2k[4]}). Its seed-0 score of 20/20 was the best single run here but did not repeat "
+            f"({', '.join(str(rowmap[('dwt_fixed_slw', s, 2000)]['successes']) for s in ss)} of 20 for seeds {', '.join(map(str, ss))}). "
+            "It also learns more slowly in mid-training (behind plain at 1000 and 1500 steps, p ≈ 0.09 and 0.12), as expected from targets "
+            "that no longer reward the exact bin; its held-out exact-bin accuracy stays about 2 points below plain. Weighting alone (one seed) "
+            "is within noise of plain at every step. Token count and latency are unchanged and motion is about as smooth. "
+            "Plain cross-entropy stays the default; soft labels + weighting was nevertheless chosen for the full-LIBERO run, where its "
+            "slower start matters less over 14,500 steps.</p>")
 
     # ---- zero-shot generalization
     gen_rows = [r for r in json.loads((RES / "eval.json").read_text())["rows"]
