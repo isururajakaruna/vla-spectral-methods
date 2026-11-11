@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>10 · What matters in the token format</title>
+<link rel="stylesheet" href="assets/deck.css">
+</head>
+<body>
+<div id="deck">
+  <section class="slide xp">
+    <div class="txt">
+      <h1>What matters in the token format</h1>
+      <p class="lead">Dropping BPE gives the biggest gain; Haar adds more on top, at about twice the tokens.</p>
+    </div>
+
+    <div class="panel" style="left:80px;top:146px;width:640px;height:510px">
+      <h2>Success after 2k steps</h2>
+      <div class="sub">Dashed bars: single seed, 20 episodes</div>
+    </div>
+    <div class="panel" style="left:750px;top:146px;width:450px;height:510px">
+      <h2>The price: inference latency</h2>
+      <div class="sub">Per action chunk, RTX A6000</div>
+    </div>
+
+    <svg id="chart" viewBox="0 0 1280 720"></svg>
+    <div class="foot-note">Closed-loop success on LIBERO-Object task 0; solid bars pool 3 seeds × 20 episodes. Haar beats DCT on the same episodes
+      (p = 0.041 at 2k steps, p = 0.002 at 1k). Latency is mean wall time to generate one 10-step chunk.</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+const svg = document.getElementById('chart');
+barChart(svg, {
+  x: 160, y: 236, w: 520, h: 310, yLabel: 'success rate',
+  bars: [
+    { label: 'FAST', sub: 'DCT + BPE', v: 17 / 60, text: '17/60', color: C.fast },
+    { label: 'Haar + BPE', sub: '1 seed', v: 9 / 20, text: '9/20', color: C.haar, faded: true },
+    { label: 'DCT', sub: 'no BPE', v: 43 / 60, text: '43/60', color: C.dct },
+    { label: 'Haar DWT', sub: 'ours', v: 53 / 60, text: '53/60', color: C.haar },
+    { label: 'sym4→Haar', sub: '1 seed', v: 15 / 20, text: '15/20', color: '#12B5CB', faded: true },
+  ],
+  groups: [{ from: 0, to: 1, label: 'with BPE' }, { from: 2, to: 4, label: 'without BPE' }],
+});
+barChart(svg, {
+  x: 840, y: 236, w: 330, h: 310, yMax: 1200, yTicks: [0, 400, 800, 1200], yFmt: v => v + ' ms', t0: 0.9,
+  bars: [
+    { label: 'FAST', sub: '29.6 tokens', v: 567, text: '567', color: C.fast },
+    { label: 'DCT', sub: '64.1 tokens', v: 1035, text: '1035', color: C.dct },
+    { label: 'adaptive', sub: '61.6 tokens', v: 1025, text: '1025', color: C.adapt },
+    { label: 'Haar', sub: '69.1 tokens', v: 1134, text: '1134', color: C.haar },
+  ],
+});
+startDeck({ index: 10, total: 12, prev: '09_learning_curves.html', next: '11_loss_variants.html' });
+</script>
+</body>
+</html>

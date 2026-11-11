@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+:root{
+  --blue:#4285F4;--red:#EA4335;--yellow:#FBBC05;--green:#34A853;
+  --ink:#202124;--sub:#5F6368;--muted:#9AA0A6;--line:#DADCE0;--soft:#F1F3F4;
+}
+html,body{margin:0;height:100%;background:#F1F3F4;overflow:hidden;
+  font-family:'Google Sans','Product Sans',Roboto,Arial,sans-serif;color:var(--ink);
+  -webkit-font-smoothing:antialiased;user-select:none}
+#deck{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center}
+.slide{position:absolute;inset:0;background:#fff;border-radius:10px;overflow:hidden;
+  animation:fadein .5s ease both;
+  box-shadow:0 1px 2px rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15)}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.slide>svg{width:100%;height:100%;display:block}
+svg text{font-family:inherit}
+.mono{font-family:'Roboto Mono',monospace}
+.h1{font-size:36px;font-weight:500;fill:var(--ink)}
+.h2{font-size:19px;fill:var(--sub)}
+.foot{font-size:13px;fill:var(--muted)}
+
+.b1,.b2{opacity:0;transition:opacity .6s ease}
+.slide[data-step="1"] .b1,.slide[data-step="2"] .b1,.slide[data-step="2"] .b2{opacity:1}
+.on0,.on1,.on2{opacity:0;transition:opacity .45s ease}
+.slide[data-step="0"] .on0,.slide[data-step="1"] .on1,.slide[data-step="2"] .on2{opacity:1}
+
+.flow{stroke-dasharray:7 8;animation:flow 1s linear infinite}
+.dots{stroke-dasharray:0.1 9;stroke-linecap:round;animation:dots .8s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-15}}
+@keyframes dots{to{stroke-dashoffset:-9.1}}
+.flash rect.chip{animation:flash .9s ease-out}
+@keyframes flash{0%{fill:#D2E3FC}100%{fill:#fff}}
+
+#pager{position:absolute;right:22px;bottom:14px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px}
+#pager a,#pager span.off{display:inline-block;width:26px;height:26px;line-height:25px;text-align:center;
+  border-radius:13px;color:var(--sub);text-decoration:none;font-size:17px}
+#pager a:hover{background:#E8F0FE;color:var(--blue)}
+#pager span.off{color:#DADCE0}
+/* experiment slides */
+.xp .txt{position:absolute;inset:0;padding:52px 80px 0;pointer-events:none}
+.xp h1{margin:0;font-size:36px;font-weight:500;line-height:1.15}
+.xp .lead{margin:12px 0 0;font-size:19px;color:var(--sub)}
+.xp .panel{position:absolute;border-radius:16px;background:#fff;
+  box-shadow:0 1px 2px rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15)}
+.xp .panel h2{margin:0;padding:18px 22px 0;font-size:19px;font-weight:500}
+.xp .panel .sub{padding:4px 22px 0;font-size:13.5px;color:var(--sub)}
+.xp .stat{position:absolute;border-radius:14px;padding:16px 20px;box-sizing:border-box}
+.xp .stat .big{font-size:34px;font-weight:500;line-height:1.1}
+.xp .stat .big small{font-size:17px;font-weight:400;opacity:.75}
+.xp .stat .cap{margin-top:6px;font-size:14.5px;line-height:1.35;color:#3C4043}
+.xp .foot-note{position:absolute;left:80px;right:150px;bottom:20px;font-size:11.5px;color:var(--muted)}
+.xp #chart{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+.ax{font-size:12px;fill:var(--sub)}
+.ax-t{font-size:12.5px;fill:var(--sub);font-weight:500}
+.draw{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw 1.6s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.grow{transform-box:fill-box;transform-origin:50% 100%;transform:scaleY(0);
+  animation:grow .9s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes grow{to{transform:scaleY(1)}}
+.grow-x{transform-box:fill-box;transform-origin:0 50%;transform:scaleX(0);
+  animation:growx .9s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes growx{to{transform:scaleX(1)}}
+.pop{opacity:0;animation:fadein .5s ease forwards}
+
+#hint{position:absolute;left:50%;bottom:-34px;transform:translateX(-50%);font-size:13px;color:var(--sub);
+  white-space:nowrap;transition:opacity .6s}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>8 · The math behind it</title>
+<link rel="stylesheet" href="assets/deck.css">
+<style>
+.txt{position:absolute;inset:0;padding:52px 80px 0;pointer-events:none}
+h1{margin:0;font-size:36px;font-weight:500;line-height:1.15}
+.lead{margin:12px 0 0;font-size:19px;color:var(--sub)}
+.card{position:absolute;top:146px;width:540px;height:526px;border-radius:16px;background:#fff;
+  box-shadow:0 1px 2px rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15)}
+.card .hd{display:flex;align-items:center;gap:12px;padding:18px 22px 0}
+.num{flex:none;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:500;font-size:17px;
+  display:flex;align-items:center;justify-content:center}
+.card h2{margin:0;font-size:21px;font-weight:500}
+.eq{margin:12px 22px 0;padding:14px 22px;border-radius:12px;height:146px;box-sizing:border-box;
+  display:grid;grid-template-columns:96px 1fr;align-content:center;row-gap:12px;align-items:center;
+  font-size:22px;color:#202124}
+.eq .lab{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.eq math{justify-self:start;math-style:normal}
+.eq .note{grid-column:1/-1;font-size:13px;color:var(--sub)}
+.blue{background:#F6F9FE} .red{background:#FEF7F6}
+#anim{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="deck">
+  <section class="slide">
+    <div class="txt">
+      <h1>The math behind it</h1>
+      <p class="lead">The wavelet transform we tokenize, and the loss we train it with.</p>
+    </div>
+
+    <div class="card" style="left:80px">
+      <div class="hd"><span class="num" style="background:#4285F4">1</span><h2>Haar wavelet transform</h2></div>
+      <div class="eq blue">
+        <span class="lab">trend</span>
+        <math><msub><mi>a</mi><mi>k</mi></msub><mo>=</mo>
+          <mfrac><mrow><msub><mi>x</mi><mrow><mn>2</mn><mi>k</mi></mrow></msub><mo>+</mo><msub><mi>x</mi><mrow><mn>2</mn><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub></mrow><msqrt><mn>2</mn></msqrt></mfrac></math>
+        <span class="lab">detail</span>
+        <math><msub><mi>d</mi><mi>k</mi></msub><mo>=</mo>
+          <mfrac><mrow><msub><mi>x</mi><mrow><mn>2</mn><mi>k</mi></mrow></msub><mo>−</mo><msub><mi>x</mi><mrow><mn>2</mn><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub></mrow><msqrt><mn>2</mn></msqrt></mfrac></math>
+        <span class="note">repeat on the trend <i>a</i> for each coarser level</span>
+      </div>
+    </div>
+
+    <div class="card" style="left:660px">
+      <div class="hd"><span class="num" style="background:#EA4335">2</span><h2>Modified loss</h2></div>
+      <div class="eq red">
+        <span class="lab">loss</span>
+        <math><mi>ℒ</mi><mo>=</mo><munder><mo>∑</mo><mi>i</mi></munder>
+          <msub><mi>w</mi><mi>i</mi></msub><mo>·</mo><mi>CE</mi><mo>(</mo><msub><mi>q</mi><mi>i</mi></msub><mo>,</mo><msub><mi>p</mi><mi>θ</mi></msub><mo>)</mo></math>
+        <span class="lab">weight</span>
+        <math><msub><mi>w</mi><mi>i</mi></msub><mo>∝</mo><msub><mi>Δ</mi><mi>i</mi></msub>
+          <mspace width="0.6em"/><mtext style="font-size:14px;color:#5F6368">(quantizer step)</mtext></math>
+        <span class="lab">soft target</span>
+        <math><msub><mi>q</mi><mi>i</mi></msub><mo>(</mo><mi>b</mi><mo>)</mo><mo>∝</mo>
+          <mi>exp</mi><mo>(</mo><mo>−</mo><mfrac><msup><mrow><mo>(</mo><mo>(</mo><mi>b</mi><mo>−</mo><msubsup><mi>b</mi><mi>i</mi><mo>*</mo></msubsup><mo>)</mo><msub><mi>Δ</mi><mi>i</mi></msub><mo>)</mo></mrow><mn>2</mn></msup><mrow><mn>2</mn><msup><mi>σ</mi><mn>2</mn></msup></mrow></mfrac><mo>)</mo></math>
+      </div>
+    </div>
+
+    <svg id="anim" viewBox="0 0 1280 720"></svg>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/spectral_anims.js"></script>
+<script>
+const svg = document.getElementById('anim');
+const anims = [
+  buildWavelet(svg, 'translate(87,178)'),
+  buildWeighting(svg, 'translate(301,236) scale(0.78)', { formula: false }),
+  buildSoftLabels(svg, 'translate(265,236) scale(0.78)', { formula: false }),
+];
+startDeck({
+  index: 8, total: 12,
+  prev: '07_our_invention.html',
+  next: '09_learning_curves.html',
+  frame: t => anims.forEach(a => a(t)),
+});
+</script>
+</body>
+</html>

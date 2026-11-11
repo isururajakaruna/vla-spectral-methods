@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>12 · Scaling up, and what is still missing</title>
+<link rel="stylesheet" href="assets/deck.css">
+</head>
+<body>
+<div id="deck">
+  <section class="slide xp">
+    <div class="txt">
+      <h1>Scaling up, and what is still missing</h1>
+      <p class="lead">One policy now runs all 40 LIBERO tasks; single-task policies do not transfer to new objects.</p>
+    </div>
+
+    <div class="panel" style="left:80px;top:146px;width:640px;height:510px">
+      <h2>All 40 tasks, one policy</h2>
+      <div class="sub">Haar DWT + soft labels + weighting · LoRA · after 1 epoch (14.5k steps)</div>
+    </div>
+    <div class="panel" style="left:750px;top:146px;width:450px;height:510px">
+      <h2>Zero-shot: 9 unseen objects</h2>
+      <div class="sub">Single-task policies, successes out of 45</div>
+    </div>
+
+    <svg id="chart" viewBox="0 0 1280 720"></svg>
+    <div class="foot-note">Left: 10 tasks × 10 episodes per suite. The grey bar is lerobot/pi0fast-libero, fully fine-tuned on all 40 tasks
+      (not a matched comparison; only its Spatial suite has been evaluated). Right: the same checkpoints solve 10–20/20 on their training task;
+      all zero-shot successes come from two objects.</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+const svg = document.getElementById('chart');
+barChart(svg, {
+  x: 160, y: 236, w: 520, h: 310, yLabel: 'success rate',
+  bars: [
+    { label: 'Spatial', sub: 'ours', v: .57, text: '57%', color: C.haar },
+    { label: 'Spatial', sub: 'π₀-FAST ref', v: .90, text: '90%', color: C.ref },
+    { label: 'Object', sub: 'ours', v: .70, text: '70%', color: C.haar },
+    { label: 'Goal', sub: 'ours', v: .63, text: '63%', color: C.haar },
+    { label: 'Long', sub: 'ours', v: .22, text: '22%', color: C.haar },
+  ],
+});
+barChart(svg, {
+  x: 820, y: 236, w: 350, h: 310, yMax: .2, yTicks: [0, .1, .2], t0: 0.9,
+  bars: [
+    { label: 'Haar', v: 6 / 45, text: '6', color: C.haar },
+    { label: 'weighted', v: 7 / 45, text: '7', color: '#FA7B17' },
+    { label: 'soft+w', v: 6 / 45, text: '6', color: '#A142F4' },
+    { label: 'sym4', v: 4 / 45, text: '4', color: '#12B5CB' },
+    { label: 'DCT', v: 2 / 45, text: '2', color: C.dct },
+    { label: 'adaptive', v: 0, text: '0', color: C.adapt },
+  ],
+});
+startDeck({ index: 12, total: 12, prev: '11_loss_variants.html', next: null });
+</script>
+</body>
+</html>

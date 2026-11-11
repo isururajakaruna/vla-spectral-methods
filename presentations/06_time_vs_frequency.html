@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>6 · Inspiration from the π₀-FAST model</title>
+<link rel="stylesheet" href="assets/deck.css">
+<style>
+.page{position:absolute;inset:0;padding:52px 80px 0}
+h1{margin:0;font-size:36px;font-weight:500;line-height:1.15}
+.lead{margin:12px 0 0;font-size:19px;color:var(--sub)}
+.grid{display:grid;grid-template-columns:300px 1fr 1fr;column-gap:20px;margin-top:26px}
+.colhead{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:14px 14px 0 0}
+.colhead h2{margin:0;font-size:21px;font-weight:500}
+.colhead p{margin:2px 0 0;font-size:13.5px;color:var(--sub)}
+.colhead.time{background:#F1F3F4}
+.colhead.freq{background:#E8F0FE}
+.colhead.freq h2{color:#1967D2}
+.row{display:contents}
+.label{display:flex;align-items:center;gap:14px;border-top:1px solid var(--line);padding:14px 0}
+.num{flex:none;width:38px;height:38px;border-radius:50%;color:#fff;font-weight:500;font-size:18px;
+  display:flex;align-items:center;justify-content:center}
+.label b{font-size:21px;font-weight:500;line-height:1.25}
+.cell{border-top:1px solid var(--line);padding:14px 18px;font-size:15.5px;line-height:1.45;color:#3C4043;
+  display:flex;gap:14px;align-items:center}
+.cell.time{background:#FAFAFA}
+.cell.freq{background:#F6F9FE}
+.row:last-child .cell{border-radius:0 0 14px 14px}
+.mark{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.mark.no{background:#FCE8E6;color:#C5221F}
+.mark.yes{background:#E6F4EA;color:#137333}
+.stat{flex:none;text-align:center;min-width:74px}
+.stat .n{font-size:34px;font-weight:500;line-height:1}
+.stat .u{font-size:12px;color:var(--sub)}
+.spark{flex:none}
+.foot-note{position:absolute;left:80px;right:140px;bottom:22px;font-size:11.5px;color:var(--muted);line-height:1.4}
+</style>
+</head>
+<body>
+<div id="deck">
+  <section class="slide">
+    <div class="page">
+      <h1>Inspiration from the π₀-FAST model</h1>
+      <p class="lead">Time domain vs frequency domain: the same action chunk, turned into tokens two different ways.</p>
+
+      <div class="grid">
+        <div></div>
+        <div class="colhead time">
+          <svg width="74" height="44" viewBox="0 0 74 44">
+            <g fill="#9AA0A6">
+              <rect x="2"  y="22" width="5" height="20" rx="1"/><rect x="9"  y="18" width="5" height="24" rx="1"/>
+              <rect x="16" y="12" width="5" height="30" rx="1"/><rect x="23" y="8"  width="5" height="34" rx="1"/>
+              <rect x="30" y="8"  width="5" height="34" rx="1"/><rect x="37" y="11" width="5" height="31" rx="1"/>
+              <rect x="44" y="17" width="5" height="25" rx="1"/><rect x="51" y="24" width="5" height="18" rx="1"/>
+              <rect x="58" y="28" width="5" height="14" rx="1"/><rect x="65" y="30" width="5" height="12" rx="1"/>
+            </g>
+          </svg>
+          <div><h2>Time domain</h2><p>one token per step, per joint</p></div>
+        </div>
+        <div class="colhead freq">
+          <svg width="74" height="44" viewBox="0 0 74 44">
+            <g fill="#4285F4">
+              <rect x="2" y="37" width="62" height="4" rx="1" fill-opacity=".35"/>
+              <rect x="2" y="32" width="48" height="4" rx="1"/><rect x="2" y="27" width="22" height="4" rx="1"/>
+              <rect x="2" y="22" width="9"  height="4" rx="1"/><rect x="2" y="17" width="4"  height="4" rx="1"/>
+              <rect x="2" y="12" width="2"  height="4" rx="1"/><rect x="2" y="7"  width="1"  height="4" rx="0.5"/>
+            </g>
+          </svg>
+          <div><h2>Frequency domain</h2><p>DCT coefficients per chunk</p></div>
+        </div>
+
+        <div class="row">
+          <div class="label"><span class="num" style="background:#4285F4">1</span><b>Faster learning,<br>less overfitting</b></div>
+          <div class="cell time"><span class="mark no">✕</span>
+            <span>Neighbouring steps are nearly identical, so the model can lower its loss by copying the previous token instead of learning the motion.</span></div>
+          <div class="cell freq"><span class="mark yes">✓</span>
+            <span>Coefficients are decorrelated: every token carries new information, so there is no copy shortcut to memorize. π₀-FAST trains up to 5× faster than diffusion π₀ at matched performance.</span></div>
+        </div>
+
+        <div class="row">
+          <div class="label"><span class="num" style="background:#EA4335">2</span><b>High token<br>compaction</b></div>
+          <div class="cell time"><span class="stat"><span class="n" style="color:#5F6368">70</span><br><span class="u">tokens / chunk</span></span>
+            <span>10 steps × 7 dims, every step coded at full precision, even when the arm barely moves.</span></div>
+          <div class="cell freq"><span class="stat"><span class="n" style="color:#1967D2">≈31</span><br><span class="u">tokens / chunk</span></span>
+            <span>Energy sits in a few low frequencies; near-zero coefficients compress away. Measured with FAST on our LIBERO task.</span></div>
+        </div>
+
+        <div class="row">
+          <div class="label"><span class="num" style="background:#34A853">3</span><b>Smooth<br>control</b></div>
+          <div class="cell time">
+            <svg class="spark" width="74" height="40" viewBox="0 0 74 40">
+              <polyline points="2,30 9,26 16,21 23,17 30,4 37,13 44,16 51,20 58,23 65,26 72,28" fill="none" stroke="#9AA0A6" stroke-width="2.5" stroke-linejoin="round"/>
+              <circle cx="30" cy="4" r="3.5" fill="#EA4335"/></svg>
+            <span>One wrong token is a one-step spike: the arm jerks.</span></div>
+          <div class="cell freq">
+            <svg class="spark" width="74" height="40" viewBox="0 0 74 40">
+              <path d="M2,30 C14,26 22,14 34,13 C46,12 56,22 72,28" fill="none" stroke="#4285F4" stroke-width="2.5"/>
+              <path d="M2,33 C14,29 22,18 34,17 C46,16 56,25 72,31" fill="none" stroke="#4285F4" stroke-width="1.5" stroke-dasharray="3 3" stroke-opacity=".6"/></svg>
+            <span>An error in one coefficient spreads as a gentle cosine over the whole chunk; high-frequency jitter stays small by construction.</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="foot-note">5× training speed-up: Pertsch et al., “FAST: Efficient Action Tokenization for Vision-Language-Action Models”, 2025.
+      ≈31 tokens: mean tokens per 10-step chunk generated by our fast_matched model, libero_object #0 (30.9 at step 2000, 31.2 at step 5000).</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script>
+startDeck({
+  index: 6, total: 12,
+  prev: '05_frequency_domain.html',
+  next: '07_our_invention.html',
+});
+</script>
+</body>
+</html>

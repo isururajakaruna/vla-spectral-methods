@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>9 · Wavelet tokens learn faster</title>
+<link rel="stylesheet" href="assets/deck.css">
+</head>
+<body>
+<div id="deck">
+  <section class="slide xp">
+    <div class="txt">
+      <h1>Key result: wavelet tokens learn faster</h1>
+      <p class="lead">Same model, same LoRA budget; only the action tokens change.</p>
+    </div>
+
+    <div class="panel" style="left:80px;top:146px;width:790px;height:510px">
+      <h2>Task success vs training steps</h2>
+      <div class="sub">LIBERO-Object task 0 · 3 seeds × 20 episodes per point · shaded: 95% CI</div>
+    </div>
+
+    <div class="stat" style="left:900px;top:146px;width:300px;height:160px;background:#E8F0FE">
+      <div class="big" style="color:#1967D2">53<small>/60</small> <span style="font-size:20px;color:#5F6368">vs</span> 17<small>/60</small></div>
+      <div class="cap">Haar DWT vs FAST after 2k steps, p &lt; 0.001.</div>
+    </div>
+    <div class="stat" style="left:900px;top:321px;width:300px;height:160px;background:#FCE8E6">
+      <div class="big" style="color:#C5221F">89%</div>
+      <div class="cap">of FAST’s output chunks fail to decode at 2k steps; Haar: 0%.</div>
+    </div>
+    <div class="stat" style="left:900px;top:496px;width:300px;height:160px;background:#FEF7E0">
+      <div class="big" style="color:#B06000">25 <span style="font-size:20px;color:#5F6368">vs</span> 7</div>
+      <div class="cap">Episodes only Haar vs only DCT solves at 1k steps, p = 0.002.</div>
+    </div>
+
+    <svg id="chart" viewBox="0 0 1280 720"></svg>
+    <div class="foot-note">Closed-loop success out of 60 at 250 / 500 / 1k / 1.5k / 2k steps. p-values: paired McNemar tests on the same
+      episodes. FAST here learns BPE tokens under the same LoRA recipe; a fully fine-tuned π₀-FAST reaches 17/20 on this task.</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+lineChart(document.getElementById('chart'), {
+  x: 172, y: 228, w: 520, h: 356,
+  xs: [250, 500, 1000, 1500, 2000], xMin: 0,
+  xLabel: 'training steps', yLabel: 'success rate',
+  series: [
+    { name: 'FAST', color: C.fast, k: [1, 12, 31, 20, 17], n: 60 },
+    { name: 'DCT, no BPE', color: C.dct, k: [2, 17, 29, 42, 43], n: 60, dy: -4 },
+    { name: 'DWT adaptive', color: C.adapt, k: [0, 4, 26, 37, 39], n: 60, dy: 6 },
+    { name: 'Haar DWT (ours)', color: C.haar, k: [0, 14, 47, 51, 53], n: 60, width: 4 },
+  ],
+});
+startDeck({ index: 9, total: 12, prev: '08_formulation.html', next: '10_token_format.html' });
+</script>
+</body>
+</html>

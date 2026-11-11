@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>11 · Did the new loss help?</title>
+<link rel="stylesheet" href="assets/deck.css">
+</head>
+<body>
+<div id="deck">
+  <section class="slide xp">
+    <div class="txt">
+      <h1>Did the new loss help?</h1>
+      <p class="lead">Not yet: on one task, weighting and soft labels match plain cross-entropy.</p>
+    </div>
+
+    <div class="panel" style="left:80px;top:146px;width:790px;height:510px">
+      <h2>Haar DWT tokens, three training losses</h2>
+      <div class="sub">LIBERO-Object task 0 · shaded: 95% CI (3 seeds × 20 episodes)</div>
+    </div>
+
+    <div class="stat" style="left:900px;top:146px;width:300px;height:160px;background:#F1F3F4">
+      <div class="big" style="color:#3C4043">52<small>/60</small> <span style="font-size:20px;color:#5F6368">vs</span> 53<small>/60</small></div>
+      <div class="cap">Soft labels + weighting vs plain CE after 2k steps, p = 1.0.</div>
+    </div>
+    <div class="stat" style="left:900px;top:321px;width:300px;height:160px;background:#F3E8FD">
+      <div class="big" style="color:#8430CE">20 · 18 · 14</div>
+      <div class="cap">Successes per seed out of 20: seed spread is bigger than the effect.</div>
+    </div>
+    <div class="stat" style="left:900px;top:496px;width:300px;height:160px;background:#E8F0FE">
+      <div class="big" style="color:#1967D2">0.042 <span style="font-size:20px;color:#5F6368">vs</span> 0.037</div>
+      <div class="cap">Mean action jerk: no smoother either (lower is smoother).</div>
+    </div>
+
+    <svg id="chart" viewBox="0 0 1280 720"></svg>
+    <div class="foot-note">Plain CE and soft labels + weighting: 3 seeds × 20 episodes per point. Weighting alone: seed 0 only (out of 20),
+      shown without a band. p-value: paired McNemar test on the same episodes.</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+lineChart(document.getElementById('chart'), {
+  x: 172, y: 228, w: 520, h: 356,
+  xs: [250, 500, 1000, 1500, 2000], xMin: 0,
+  xLabel: 'training steps', yLabel: 'success rate',
+  series: [
+    { name: 'weighting only', color: '#FA7B17', k: [0, 17, 10, 17, 17], n: 20, ci: false, width: 2.4, dy: 26 },
+    { name: 'soft + weighting', color: '#A142F4', k: [3, 17, 37, 43, 52], n: 60, dy: 12 },
+    { name: 'plain CE', color: C.haar, k: [0, 14, 47, 51, 53], n: 60, dy: -8 },
+  ],
+});
+startDeck({ index: 11, total: 12, prev: '10_token_format.html', next: '12_scaling_and_limits.html' });
+</script>
+</body>
+</html>
