@@ -67,7 +67,7 @@
 const armCam = makeArm(document.getElementById('cam'), { x: 160, y: 352, s: 0.62, table: [-200, 400] });
 const armRob = makeArm(document.getElementById('rob'), { x: 1000, y: 445, s: 0.82, table: [-200, 400] });
 startDeck({
-  index: 2, total: 12,
+  index: 2, total: 13,
   prev: '01_title.html',
   next: '03_joint_angles.html',
   frame: t => { const st = sceneState(t); armCam.update(st); armRob.update(st); },

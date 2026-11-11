@@ -86,7 +86,7 @@ function sceneState(t) {
   return { q, g, fk: k, can };
 }
 
-function makeArm(parent, { x, y, s, table = [-170, 330] }) {
+function makeArm(parent, { x, y, s, table = [-170, 330], mono = false }) {
   const nss = { 'vector-effect': 'non-scaling-stroke' };
   const root = el('g', { transform: `translate(${x},${y}) scale(${s},${-s})` }, parent);
   el('rect', { x: table[0], y: -79, width: table[1] - table[0], height: 46, fill: '#F8F9FA' }, root);
@@ -94,9 +94,10 @@ function makeArm(parent, { x, y, s, table = [-170, 330] }) {
   el('rect', { x: 52, y: -33, width: 76, height: 34, fill: '#E8EAED' }, root);
 
   const can = el('g', {}, root);
-  el('rect', { x: -15, y: -20, width: 30, height: 40, rx: 5, fill: '#FBBC05', stroke: '#E37400', 'stroke-width': 1.5, ...nss }, can);
+  el('rect', { x: -15, y: -20, width: 30, height: 40, rx: 5, fill: mono ? '#DADCE0' : '#FBBC05',
+    stroke: mono ? '#80868B' : '#E37400', 'stroke-width': 1.5, ...nss }, can);
   el('rect', { x: -15, y: -7, width: 30, height: 13, fill: '#fff', 'fill-opacity': 0.9 }, can);
-  el('rect', { x: -15, y: 15, width: 30, height: 5, rx: 2, fill: '#F29900' }, can);
+  el('rect', { x: -15, y: 15, width: 30, height: 5, rx: 2, fill: mono ? '#9AA0A6' : '#F29900' }, can);
 
   el('path', { d: 'M50,-33 L130,-33 L135,-2 L45,-2 Z', fill: '#fff', stroke: '#9AA0A6', 'stroke-width': 2, 'stroke-linejoin': 'round', ...nss }, root);
   for (const bx of [68, 84, 100, 116])
@@ -119,7 +120,8 @@ function makeArm(parent, { x, y, s, table = [-170, 330] }) {
     el('circle', { r: 15, fill: c, stroke: '#fff', 'stroke-width': 3, ...nss }, p);
     el('circle', { r: 5, fill: '#fff' }, p);
   };
-  joint(g3, GREEN); joint(g2, RED); joint(g1, BLUE);
+  const jc = mono ? ['#3C4043', '#3C4043', '#3C4043'] : JCOL;
+  joint(g3, jc[2]); joint(g2, jc[1]); joint(g1, jc[0]);
 
   return {
     update(st) {
