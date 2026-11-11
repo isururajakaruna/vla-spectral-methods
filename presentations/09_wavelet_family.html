@@ -89,28 +89,35 @@ table.m td.bad{color:#C5221F}
 <script src="assets/deck.js"></script>
 <script src="assets/charts.js"></script>
 <script>
-// score = tokens at FAST accuracy / Haar's (H = 10, best boundary mode); null = not perfectly reconstructing
+// [name, score, p99 max error]; score = tokens at FAST accuracy / Haar's (H = 10, best boundary mode),
+// null = not perfectly reconstructing
 const RANK = [
-  ['haar,haar→bior4.4', 0.9997], ['haar', 1.0], ['haar→bior2.2', 1.0026], ['haar→db2→db4', 1.0026],
-  ['bior1.3', 1.0037], ['sym4→haar', 1.0039], ['haar→sym4', 1.0149], ['sym5', 1.0393], ['db4', 1.0417],
-  ['bior4.4', 1.0663], ['bior6.8', 1.0697], ['bior2.2', 1.0727], ['coif2', 1.0757], ['coif1', 1.0766],
-  ['coif3', 1.0766], ['bior2.4', 1.0777], ['sym6', 1.0826], ['db3', 1.0827], ['db6', 1.0838], ['sym4', 1.0897],
-  ['db2→coif1', 1.0929], ['db2', 1.0983], ['bior3.3', 1.1441], ['rbio2.2', 1.1499], ['rbio3.3', 2.5613], ['dmey', null],
+  ['haar,haar→bior4.4', 0.9997, .189], ['haar', 1.0, .184], ['haar→bior2.2', 1.0026, .188], ['haar→db2→db4', 1.0026, .190],
+  ['bior1.3', 1.0037, .185], ['sym4→haar', 1.0039, .181], ['haar→sym4', 1.0149, .194], ['sym5', 1.0393, .249],
+  ['db4', 1.0417, .205], ['bior4.4', 1.0663, .271], ['bior6.8', 1.0697, .270], ['bior2.2', 1.0727, .272],
+  ['coif2', 1.0757, .305], ['coif1', 1.0766, .274], ['coif3', 1.0766, .286], ['bior2.4', 1.0777, .257],
+  ['sym6', 1.0826, .339], ['db3', 1.0827, .333], ['db6', 1.0838, .294], ['sym4', 1.0897, .336],
+  ['db2→coif1', 1.0929, .281], ['db2', 1.0983, .294], ['bior3.3', 1.1441, .142], ['rbio2.2', 1.1499, .190],
+  ['rbio3.3', 2.5613, .144], ['dmey', null, .274],
 ];
 const svg = document.getElementById('chart');
 const g = el('g', {}, svg);
-const LX = 566, BX = 574, BW = 168, MAXP = 16, Y0 = 232, DY = 15.6;
+const LX = 556, PX = 594, BX = 610, BW = 136, MAXP = 16, Y0 = 232, DY = 15.6;
+label(g, PX, Y0 - 18, 'p99 err', { 'text-anchor': 'end', 'font-size': 10.5, fill: '#5F6368', 'font-weight': 500 });
+label(g, BX, Y0 - 18, 'extra tokens', { 'font-size': 10.5, fill: '#5F6368', 'font-weight': 500 });
 const BXp = p => BX + Math.min(p, MAXP) / MAXP * BW;
 for (const p of [0, 5, 10, 15]) {
   el('line', { x1: BXp(p), x2: BXp(p), y1: Y0 - 12, y2: Y0 + DY * 25 + 8, stroke: p ? '#ECEDEF' : '#BDC1C6' }, g);
   label(g, BXp(p), Y0 + DY * 25 + 24, `+${p}%`, { class: 'ax', 'text-anchor': 'middle' });
 }
-RANK.forEach(([name, s], i) => {
+RANK.forEach(([name, s, p99], i) => {
   const y = Y0 + i * DY, t = 0.3 + i * 0.05;
   const col = name === 'haar' ? C.haar : name === 'sym4→haar' ? '#12B5CB' : '#BDC1C6';
   const strong = col !== '#BDC1C6';
   label(g, LX, y + 4, name, { 'text-anchor': 'end', 'font-size': 11.5, class: 'mono',
     fill: strong ? col : '#5F6368', 'font-weight': strong ? 500 : 400 });
+  label(g, PX, y + 4, p99.toFixed(2), { 'text-anchor': 'end', 'font-size': 11, class: 'mono',
+    fill: p99 < 0.2 ? '#137333' : p99 > 0.3 ? '#C5221F' : '#80868B' });
   if (s === null) {
     delay(label(g, BX + 4, y + 4, 'not exactly invertible', { 'font-size': 11, fill: '#C5221F', class: 'pop' }), t);
     return;
