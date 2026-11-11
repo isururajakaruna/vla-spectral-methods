@@ -5,14 +5,6 @@
 <title>9 · Finding the wavelet family</title>
 <link rel="stylesheet" href="assets/deck.css">
 <style>
-.fam{padding:0 20px;margin-top:9px}
-.fam .nm{font-size:11.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--sub);margin-bottom:4px}
-.chips{display:flex;flex-wrap:wrap;gap:4px}
-.chip{font-family:'Roboto Mono',monospace;font-size:11.5px;padding:2px 7px;border-radius:11px;background:#F1F3F4;color:#3C4043}
-.chip.win{background:#4285F4;color:#fff}
-.chip.run{background:#E4F7FB;color:#007B83;box-shadow:inset 0 0 0 1.5px #12B5CB}
-.bigN{position:absolute;right:22px;top:14px;font-size:40px;font-weight:500;color:#1967D2;line-height:1}
-.bigN small{display:block;text-align:right;font-size:12px;font-weight:400;color:var(--sub);margin-top:2px}
 table.m{margin:14px 18px 0;border-collapse:collapse;font-size:13.5px;width:calc(100% - 36px)}
 table.m th{font-size:11px;font-weight:500;color:var(--sub);text-align:right;padding:0 6px 8px;line-height:1.25;vertical-align:bottom}
 table.m td{text-align:right;padding:7px 6px;border-top:1px solid #ECEDEF;font-variant-numeric:tabular-nums}
@@ -34,28 +26,12 @@ table.m td.bad{color:#C5221F}
   <section class="slide xp">
     <div class="txt">
       <h1>Finding the wavelet family</h1>
-      <p class="lead">Every candidate scored offline on LIBERO action chunks before any training.</p>
+      <p class="lead">N = 26 candidate transforms × 2 boundary modes, scored offline on LIBERO action chunks before any training.</p>
     </div>
 
     <div class="panel" style="left:80px;top:146px;width:320px;height:510px">
-      <h2>Candidates</h2>
-      <div class="sub">× 2 boundary modes</div>
-      <div class="bigN">N = 26<small>transforms</small></div>
-      <div class="fam"><div class="nm">Haar</div><div class="chips"><span class="chip win">haar</span></div></div>
-      <div class="fam"><div class="nm">Daubechies</div><div class="chips">
-        <span class="chip">db2</span><span class="chip">db3</span><span class="chip">db4</span><span class="chip">db6</span></div></div>
-      <div class="fam"><div class="nm">Symlets</div><div class="chips">
-        <span class="chip">sym4</span><span class="chip">sym5</span><span class="chip">sym6</span></div></div>
-      <div class="fam"><div class="nm">Coiflets</div><div class="chips">
-        <span class="chip">coif1</span><span class="chip">coif2</span><span class="chip">coif3</span></div></div>
-      <div class="fam"><div class="nm">Biorthogonal</div><div class="chips">
-        <span class="chip">bior1.3</span><span class="chip">bior2.2</span><span class="chip">bior2.4</span>
-        <span class="chip">bior3.3</span><span class="chip">bior4.4</span><span class="chip">bior6.8</span>
-        <span class="chip">rbio2.2</span><span class="chip">rbio3.3</span></div></div>
-      <div class="fam"><div class="nm">Meyer</div><div class="chips"><span class="chip">dmey</span></div></div>
-      <div class="fam"><div class="nm">Mixed: one wavelet per level</div><div class="chips">
-        <span class="chip run">sym4→haar</span><span class="chip">haar→sym4</span><span class="chip">haar→bior2.2</span>
-        <span class="chip">haar→db2→db4</span><span class="chip">haar,haar→bior4.4</span><span class="chip">db2→coif1</span></div></div>
+      <h2>Ranking: worst-case error</h2>
+      <div class="sub">p99 max error per chunk, lower is better</div>
     </div>
 
     <div class="panel" style="left:420px;top:146px;width:390px;height:510px">
@@ -89,46 +65,58 @@ table.m td.bad{color:#C5221F}
 <script src="assets/deck.js"></script>
 <script src="assets/charts.js"></script>
 <script>
-// [name, score, p99 max error]; score = tokens at FAST accuracy / Haar's (H = 10, best boundary mode),
-// null = not perfectly reconstructing
+// score = tokens at FAST accuracy / Haar's (H = 10, best boundary mode); null = not perfectly reconstructing
 const RANK = [
-  ['haar,haar→bior4.4', 0.9997, .189], ['haar', 1.0, .184], ['haar→bior2.2', 1.0026, .188], ['haar→db2→db4', 1.0026, .190],
-  ['bior1.3', 1.0037, .185], ['sym4→haar', 1.0039, .181], ['haar→sym4', 1.0149, .194], ['sym5', 1.0393, .249],
-  ['db4', 1.0417, .205], ['bior4.4', 1.0663, .271], ['bior6.8', 1.0697, .270], ['bior2.2', 1.0727, .272],
-  ['coif2', 1.0757, .305], ['coif1', 1.0766, .274], ['coif3', 1.0766, .286], ['bior2.4', 1.0777, .257],
-  ['sym6', 1.0826, .339], ['db3', 1.0827, .333], ['db6', 1.0838, .294], ['sym4', 1.0897, .336],
-  ['db2→coif1', 1.0929, .281], ['db2', 1.0983, .294], ['bior3.3', 1.1441, .142], ['rbio2.2', 1.1499, .190],
-  ['rbio3.3', 2.5613, .144], ['dmey', null, .274],
+  ['haar,haar→bior4.4', 0.9997], ['haar', 1.0], ['haar→bior2.2', 1.0026], ['haar→db2→db4', 1.0026],
+  ['bior1.3', 1.0037], ['sym4→haar', 1.0039], ['haar→sym4', 1.0149], ['sym5', 1.0393], ['db4', 1.0417],
+  ['bior4.4', 1.0663], ['bior6.8', 1.0697], ['bior2.2', 1.0727], ['coif2', 1.0757], ['coif1', 1.0766],
+  ['coif3', 1.0766], ['bior2.4', 1.0777], ['sym6', 1.0826], ['db3', 1.0827], ['db6', 1.0838], ['sym4', 1.0897],
+  ['db2→coif1', 1.0929], ['db2', 1.0983], ['bior3.3', 1.1441], ['rbio2.2', 1.1499], ['rbio3.3', 2.5613], ['dmey', null],
+];
+// p99 of the per-chunk max abs error at the operating point matching FAST's accuracy (same rows as RANK)
+const P99 = [
+  ['bior3.3', 0.142], ['rbio3.3', 0.144], ['sym4→haar', 0.181], ['haar', 0.184], ['bior1.3', 0.185],
+  ['haar→bior2.2', 0.188], ['haar,haar→bior4.4', 0.189], ['haar→db2→db4', 0.190], ['rbio2.2', 0.190],
+  ['haar→sym4', 0.194], ['db4', 0.205], ['sym5', 0.249], ['bior2.4', 0.257], ['bior6.8', 0.270],
+  ['bior4.4', 0.271], ['bior2.2', 0.272], ['coif1', 0.274], ['dmey', 0.274], ['db2→coif1', 0.281],
+  ['coif3', 0.286], ['db2', 0.294], ['db6', 0.294], ['coif2', 0.305], ['db3', 0.333], ['sym4', 0.336], ['sym6', 0.339],
 ];
 const svg = document.getElementById('chart');
-const g = el('g', {}, svg);
-const LX = 556, PX = 594, BX = 610, BW = 136, MAXP = 16, Y0 = 232, DY = 15.6;
-label(g, PX, Y0 - 18, 'p99 err', { 'text-anchor': 'end', 'font-size': 10.5, fill: '#5F6368', 'font-weight': 500 });
-label(g, BX, Y0 - 18, 'extra tokens', { 'font-size': 10.5, fill: '#5F6368', 'font-weight': 500 });
-const BXp = p => BX + Math.min(p, MAXP) / MAXP * BW;
-for (const p of [0, 5, 10, 15]) {
-  el('line', { x1: BXp(p), x2: BXp(p), y1: Y0 - 12, y2: Y0 + DY * 25 + 8, stroke: p ? '#ECEDEF' : '#BDC1C6' }, g);
-  label(g, BXp(p), Y0 + DY * 25 + 24, `+${p}%`, { class: 'ax', 'text-anchor': 'middle' });
-}
-RANK.forEach(([name, s, p99], i) => {
-  const y = Y0 + i * DY, t = 0.3 + i * 0.05;
-  const col = name === 'haar' ? C.haar : name === 'sym4→haar' ? '#12B5CB' : '#BDC1C6';
-  const strong = col !== '#BDC1C6';
-  label(g, LX, y + 4, name, { 'text-anchor': 'end', 'font-size': 11.5, class: 'mono',
-    fill: strong ? col : '#5F6368', 'font-weight': strong ? 500 : 400 });
-  label(g, PX, y + 4, p99.toFixed(2), { 'text-anchor': 'end', 'font-size': 11, class: 'mono',
-    fill: p99 < 0.2 ? '#137333' : p99 > 0.3 ? '#C5221F' : '#80868B' });
-  if (s === null) {
-    delay(label(g, BX + 4, y + 4, 'not exactly invertible', { 'font-size': 11, fill: '#C5221F', class: 'pop' }), t);
-    return;
+const Y0 = 232, DY = 15.6;
+
+function ranking({ LX, BW, max, ticks, tickFmt, rows, value, valueFmt, t0 = 0.3 }) {
+  const g = el('g', {}, svg), BX = LX + 8;
+  const BXv = v => BX + Math.min(v, max) / max * BW;
+  for (const v of ticks) {
+    el('line', { x1: BXv(v), x2: BXv(v), y1: Y0 - 12, y2: Y0 + DY * 25 + 8, stroke: v ? '#ECEDEF' : '#BDC1C6' }, g);
+    label(g, BXv(v), Y0 + DY * 25 + 24, tickFmt(v), { class: 'ax', 'text-anchor': 'middle' });
   }
-  const p = (s - 1) * 100;
-  const w = Math.max(BXp(Math.max(p, 0)) - BX, 2);
-  delay(el('rect', { x: BX, y: y - 5, width: w, height: 10, rx: 3, fill: col, class: 'grow-x' }, g), t);
-  if (p > MAXP) el('path', { d: `M${BX + w - 9},${y + 7}l4,-14M${BX + w - 4},${y + 7}l4,-14`, stroke: '#fff', 'stroke-width': 2.5 }, g);
-  const txt = Math.abs(p) < 0.05 ? '0.0%' : (p < 0 ? '−' : '+') + Math.abs(p).toFixed(1) + '%';
-  delay(label(g, BX + w + 6, y + 4, txt, { 'font-size': 11, fill: strong ? col : '#80868B',
-    'font-weight': strong ? 500 : 400, class: 'pop' }), t + 0.5);
+  rows.forEach(([name, raw], i) => {
+    const y = Y0 + i * DY, t = t0 + i * 0.05;
+    const col = name === 'haar' ? C.haar : name === 'sym4→haar' ? '#12B5CB' : '#BDC1C6';
+    const strong = col !== '#BDC1C6';
+    label(g, LX, y + 4, name, { 'text-anchor': 'end', 'font-size': 11.5, class: 'mono',
+      fill: strong ? col : name === 'dmey' ? '#C5221F' : '#5F6368', 'font-weight': strong ? 500 : 400 });
+    if (raw === null) {
+      delay(label(g, BX + 4, y + 4, 'not exactly invertible', { 'font-size': 11, fill: '#C5221F', class: 'pop' }), t);
+      return;
+    }
+    const v = value(raw), w = Math.max(BXv(Math.max(v, 0)) - BX, 2);
+    delay(el('rect', { x: BX, y: y - 5, width: w, height: 10, rx: 3, fill: col, class: 'grow-x' }, g), t);
+    if (v > max) el('path', { d: `M${BX + w - 9},${y + 7}l4,-14M${BX + w - 4},${y + 7}l4,-14`, stroke: '#fff', 'stroke-width': 2.5 }, g);
+    delay(label(g, BX + w + 6, y + 4, valueFmt(v), { 'font-size': 11, fill: strong ? col : '#80868B',
+      'font-weight': strong ? 500 : 400, class: 'pop' }), t + 0.5);
+  });
+}
+
+ranking({
+  LX: 226, BW: 120, max: 0.35, ticks: [0, 0.1, 0.2, 0.3], tickFmt: v => v ? v.toFixed(1) : '0',
+  rows: P99, value: v => v, valueFmt: v => v.toFixed(2),
+});
+ranking({
+  LX: 566, BW: 168, max: 16, ticks: [0, 5, 10, 15], tickFmt: p => `+${p}%`, t0: 0.6,
+  rows: RANK, value: s => (s - 1) * 100,
+  valueFmt: p => Math.abs(p) < 0.05 ? '0.0%' : (p < 0 ? '−' : '+') + Math.abs(p).toFixed(1) + '%',
 });
 startDeck({ index: 9, total: 13, prev: '08_formulation.html', next: '10_learning_curves.html' });
 </script>
