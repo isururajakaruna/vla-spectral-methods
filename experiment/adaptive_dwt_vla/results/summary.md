@@ -38,6 +38,8 @@ Same fixed initial states (listed per row) for every model, 256×256 renders, 10
 | dwt_fixed@pilot_dwt_fixed:step_05000 | libero_object#0 | 17/20 | 0.85 | [0.64, 0.95] | 69.1 | 1137 | 1363 | 0/347 | 87 | 0–19 |
 | dwt_adaptive@pilot_dwt_adaptive:step_05000 | libero_object#0 | 13/20 | 0.65 | [0.43, 0.82] | 63.4 | 1061 | 1328 | 0/412 | 151 | 0–19 |
 | full40_dwt_fixed_slw@full_s0_dwt_fixed_slw:step_14500 | libero_object#0 | 4/10 | 0.40 | [0.17, 0.69] | 69.1 | 1109 | 1289 | 0/263 | – | 0–9 |
+| full40_dwt_fixed_slw@full_s0_dwt_fixed_slw:step_43500 | libero_object#0 | 8/10 | 0.80 | [0.49, 0.94] | 69.1 | 1126 | 1290 | 0/207 | – | 0–9 |
+| full40_ref_pi0fast_libero | libero_object#0 | 10/10 | 1.00 | [0.72, 1.00] | – | 429 | 551 | n/a | – | 0–9 |
 
 *Malformed chunks*: for `fast_matched`, generated streams without `|` or whose BPE decode is not exactly 70 DCT coefficients; they are executed after upstream's relaxed decode (zero-pad / truncate), exactly as stock π₀-FAST does. For the DWT variants, streams the grammar parser rejects (replaced by the safe fallback chunk); the constrained decoder makes these impossible by construction. *Masked grammar violations*: generated positions where the unconstrained argmax was an illegal token and the FSM mask changed the choice. Not available for `ref_*` (stock decoder).
 
