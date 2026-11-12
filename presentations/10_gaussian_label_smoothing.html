@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>10 · Zoom into math: Gaussian label smoothing</title>
+<link rel="stylesheet" href="assets/deck.css">
+</head>
+<body>
+<div id="deck">
+  <section class="slide xp">
+    <div class="txt">
+      <h1>Zoom into math: Gaussian label smoothing</h1>
+      <p class="lead">The model writes an action one token at a time; each token is a probability over bins.</p>
+    </div>
+    <svg id="anim" viewBox="0 0 1280 720" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg>
+    <div class="foot-note">Each slice: one token’s distribution over coefficient bins (13 of 256 shown). Bottom: a Gaussian around the bin
+      gives its neighbours partial credit (red, darker = more); bins outside it get none. Illustrative distributions.</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+const svg = document.getElementById('anim');
+const N_BINS = 13, PW = 240, PH = 140, SKEW = -0.32, SQ = 0.5;
+const K = 6, X0 = 470, DX = 96, ROWS_Y = [212, 474];
+const SIGMA_BINS = 1.2, SOFT = '#EA4335';
+// per slice: [center, width, amplitude] bumps; the first bump is the most likely bin
+const SHAPES = [
+  [[2, 0.7, 1], [6, 1.0, 0.25]],
+  [[7, 2.2, 1]],
+  [[4, 0.8, 1], [6.5, 1.8, 0.45]],
+  [[9, 0.9, 1], [3, 1.0, 0.6]],
+  [[5, 0.45, 1]],
+  [[10, 0.8, 1], [8.5, 1.6, 0.7]],
+];
+const ease = u => u * u * (3 - 2 * u);
+const clamp = u => Math.max(0, Math.min(1, u));
+
+function dist(k) {
+  const raw = [];
+  for (let i = 0; i < N_BINS; i++) {
+    const noise = 0.5 + 0.5 * Math.sin(12.9898 * (i + 1) * (k + 3));
+    raw.push(SHAPES[k].reduce((acc, [c, w, a]) => acc + a * Math.exp(-((i - c) ** 2) / (2 * w * w)), 0.02 * noise));
+  }
+  const s = raw.reduce((a, b) => a + b);
+  return raw.map(v => v / s);
+}
+
+const ROWS = [
+  { title: 'Standard (one-hot) cross-entropy', sub: 'only the target bin counts', color: '#4285F4', ink: '#1967D2', box: 232 },
+  { title: 'Gaussian smoothing cross-entropy', sub: 'neighbouring bins share the credit', color: SOFT, ink: '#C5221F', box: 470 },
+];
+const OUTS = ROWS.map(r => [362, r.box + 58]);
+const pulses = ROWS.map((r, k) => {
+  const g = el('g', {}, svg);
+  label(g, 92, r.box - 30, r.title, { 'font-size': 17, 'font-weight': 500, fill: r.ink });
+  label(g, 92, r.box - 10, r.sub, { 'font-size': 13, fill: '#5F6368' });
+  el('rect', { x: 92, y: r.box, width: 230, height: 116, rx: 18, fill: '#fff', stroke: '#DADCE0', 'stroke-width': 1.5, filter: 'url(#sh)' }, g);
+  el('rect', { x: 92, y: r.box, width: 10, height: 116, rx: 5, fill: r.color }, g);
+  label(g, 212, r.box + 68, 'VLA', { 'text-anchor': 'middle', 'font-size': 30, 'font-weight': 500, fill: '#202124' });
+  const [ox, oy] = OUTS[k];
+  el('path', { d: `M322,${oy} H${ox - 8}`, stroke: r.color, 'stroke-width': 2.5 }, g);
+  return el('circle', { cx: ox, cy: oy, r: 7, fill: r.color }, g);
+});
+
+function makeSlice(k, row) {
+  const p = dist(k), top = p.indexOf(Math.max(...p));
+  const outer = el('g', {}, layers[row]);
+  const plane = el('g', {}, outer);
+  el('rect', { x: 0, y: 0, width: PW, height: PH, rx: 6, fill: '#fff', stroke: '#DADCE0', 'stroke-width': 1.5 }, plane);
+  for (const gy of [0.25, 0.5, 0.75])
+    el('line', { x1: 8, x2: PW - 8, y1: PH * gy, y2: PH * gy, stroke: '#F1F3F4', 'stroke-width': 1 }, plane);
+  el('line', { x1: 8, x2: PW - 8, y1: PH - 10, y2: PH - 10, stroke: '#BDC1C6', 'stroke-width': 1.5 }, plane);
+  const bw = (PW - 16) / N_BINS, base = PH - 10, hmax = PH - 26;
+  const q = p.map((_, i) => Math.exp(-((i - top) ** 2) / (2 * SIGMA_BINS ** 2)));
+  const bars = p.map((v, i) => {
+    const attrs = { x: 8 + i * bw + 2, width: bw - 4, rx: 2, fill: '#BDC1C6' };
+    if (row === 0 && i === top) attrs.fill = '#4285F4';
+    if (row === 1 && q[i] > 0.05) { attrs.fill = SOFT; attrs['fill-opacity'] = 0.3 + 0.7 * q[i]; }
+    return el('rect', attrs, plane);
+  });
+  const hs = p.map(v => Math.min(v / 0.42, 1) * hmax);
+  let curve = null;
+  if (row === 1) {
+    const pts = [];
+    for (let x = 0; x <= N_BINS; x += 0.1) {
+      const qi = Math.exp(-((x - 0.5 - top) ** 2) / (2 * SIGMA_BINS ** 2));
+      pts.push(`${(8 + x * bw).toFixed(1)},${(base - qi * hmax).toFixed(1)}`);
+    }
+    curve = el('g', {}, plane);
+    el('path', { d: `M8,${base} L${pts.join(' L')} L${PW - 8},${base} Z`, fill: SOFT, 'fill-opacity': 0.08 }, curve);
+    el('path', { d: `M${pts.join(' L')}`, fill: 'none', stroke: SOFT, 'stroke-width': 2.2, 'stroke-dasharray': '5 3' }, curve);
+  }
+  const tag = el('g', {}, outer);
+  const xc = 8 + (top + 0.5) * bw;
+  const peakY = row ? base - hmax : base - hs[top];
+  const tx = xc * SQ, ty = xc * SQ * SKEW * 2 + peakY - 12;
+  el('rect', { x: tx - 22, y: ty - 15, width: 44, height: 20, rx: 10, fill: row ? '#FCE8E6' : '#E8F0FE' }, tag);
+  label(tag, tx, ty, `b${120 + top * 3 + k}`, { 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 500,
+    fill: row ? '#C5221F' : '#1967D2', class: 'mono' });
+  const tl = label(outer, 0, PH + 20, `token ${k + 1}`, { 'font-size': 12.5, fill: '#5F6368' });
+  return { outer, plane, bars, hs, tag, tl, curve, row, k };
+}
+
+const layers = [el('g', {}, svg), el('g', {}, svg)];
+const slices = [];
+for (let row = 0; row < 2; row++) for (let k = 0; k < K; k++) slices.push(makeSlice(k, row));
+
+function frame(t) {
+  const fade = t > 8.3 ? 1 - clamp((t - 8.3) / 0.6) : 1;
+  const emitting = [0, 0];
+  slices.forEach(s => {
+    const t0 = 0.4 + s.k * 1.15 + s.row * 0.35;
+    const m = ease(clamp((t - t0) / 0.7)), gr = ease(clamp((t - t0 - 0.55) / 0.45));
+    if (t < t0) { s.outer.setAttribute('opacity', 0); return; }
+    if (t < t0 + 0.7) emitting[s.row] = 1;
+    const [ox, oy] = OUTS[s.row];
+    const ex = X0 + s.k * DX, ey = ROWS_Y[s.row];
+    const x = ox + (ex - ox) * m, y = oy - PH / 2 + (ey - oy + PH / 2) * m;
+    const sc = 0.25 + 0.75 * m;
+    s.outer.setAttribute('opacity', Math.min(1, m * 2.5) * fade);
+    s.outer.setAttribute('transform', `translate(${x},${y}) scale(${sc})`);
+    s.plane.setAttribute('transform', `matrix(${SQ},${SQ * SKEW * 2},0,1,0,0)`);
+    s.bars.forEach((b, i) => {
+      const h = Math.max(s.hs[i] * gr, 0.5);
+      b.setAttribute('y', PH - 10 - h); b.setAttribute('height', h);
+    });
+    if (s.curve) {
+      const c = ease(clamp((t - t0 - 0.9) / 0.4));
+      s.curve.setAttribute('opacity', c);
+      s.curve.setAttribute('transform', `translate(0,${(PH - 10) * (1 - c)}) scale(1,${Math.max(c, 0.001)})`);
+    }
+    s.tag.setAttribute('opacity', clamp((t - t0 - 0.95) / 0.3));
+    s.tl.setAttribute('opacity', m);
+  });
+  pulses.forEach((p, r) => p.setAttribute('r', 6 + 3 * emitting[r] * Math.abs(Math.sin(t * 9))));
+}
+
+startDeck({
+  index: 10, total: 15,
+  prev: '09_scale_aware_loss.html',
+  next: '11_wavelet_family.html',
+  frame: t => frame(t),
+});
+</script>
+</body>
+</html>

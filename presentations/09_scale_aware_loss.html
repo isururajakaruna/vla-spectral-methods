@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>9 · Zoom into math: Scale Aware Loss</title>
+<title>9 · Zoom into math: Scale aware loss</title>
 <link rel="stylesheet" href="assets/deck.css">
 <style>
 .eqs{margin:14px 20px 0;padding:16px 22px 4px;border-radius:12px;background:#FEF7F6;
@@ -19,7 +19,7 @@
 <div id="deck">
   <section class="slide xp">
     <div class="txt">
-      <h1>Zoom into math: Scale Aware Loss</h1>
+      <h1>Zoom into math: Scale aware loss</h1>
       <p class="lead">The same ±0.02 nudge costs little on a fine detail and a lot on the coarse trend.</p>
     </div>
 
@@ -162,9 +162,9 @@ function row(y0, idx, rise) {
 
 const rows = [row(146, 4, 0.03), row(417, 0, 0.20)];
 startDeck({
-  index: 9, total: 14,
+  index: 9, total: 15,
   prev: '08_formulation.html',
-  next: '10_wavelet_family.html',
+  next: '10_gaussian_label_smoothing.html',
   frame: t => rows.forEach(r => r(t)),
 });
 </script>
