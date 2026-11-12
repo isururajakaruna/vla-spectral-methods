@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>9 · Same nudge, different stakes</title>
+<link rel="stylesheet" href="assets/deck.css">
+<style>
+.eqs{margin:14px 20px 0;padding:16px 22px 4px;border-radius:12px;background:#FEF7F6;
+  display:grid;grid-template-columns:92px 1fr;row-gap:4px;align-items:center;font-size:21px;color:#202124}
+.eqs .lab{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.eqs math{justify-self:start;math-style:normal}
+.eqs .note{grid-column:2;font-size:13px;color:var(--sub);margin:2px 0 13px}
+.eqs .sep{grid-column:1/-1;border-top:1px solid #F5D3CF;margin:0 0 12px}
+.xp .panel h2 .tag{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:10px;font-size:12.5px;
+  font-weight:500;background:#FCE8E6;color:#C5221F;vertical-align:2px}
+</style>
+</head>
+<body>
+<div id="deck">
+  <section class="slide xp">
+    <div class="txt">
+      <h1>Same nudge, different stakes</h1>
+      <p class="lead">Zooming into the loss: the same ±0.02 nudge costs little on a fine detail and a lot on the coarse trend.</p>
+    </div>
+
+    <div class="panel" style="left:80px;top:146px;width:500px;height:526px">
+      <h2>Exact weighting</h2>
+      <div class="eqs">
+        <span class="lab">loss</span>
+        <math><mi>ℒ</mi><mo>=</mo><mfrac>
+          <mrow><munder><mo>∑</mo><mi>t</mi></munder><msub><mi>m</mi><mi>t</mi></msub><mspace width="0.15em"/><msub><mi>w</mi><mi>t</mi></msub><mspace width="0.15em"/><msub><mi>ℓ</mi><mi>t</mi></msub></mrow>
+          <mrow><munder><mo>∑</mo><mi>t</mi></munder><msub><mi>m</mi><mi>t</mi></msub></mrow></mfrac></math>
+        <span class="note">mean over the batch’s action tokens <i>t</i> (mask <i>m</i>)</span>
+        <span class="lab">per token</span>
+        <math><msub><mi>ℓ</mi><mi>t</mi></msub><mo>=</mo><mo>−</mo><munder><mo>∑</mo><mi>b</mi></munder>
+          <msub><mi>q</mi><mi>t</mi></msub><mo>(</mo><mi>b</mi><mo>)</mo><mspace width="0.2em"/><mi>log</mi><mspace width="0.2em"/><msub><mi>p</mi><mi>θ</mi></msub><mo>(</mo><mi>b</mi><mo>)</mo></math>
+        <span class="note"><i>q</i>: one-hot on the true bin <i>b</i>*, or the soft target</span>
+        <span class="lab">weight</span>
+        <math><msub><mi>w</mi><mi>t</mi></msub><mo>=</mo><mfrac><msub><mi>Δ</mi><mi>t</mi></msub>
+          <mrow><mi>mean</mi><mo>(</mo><mi>Δ</mi><mo>)</mo></mrow></mfrac></math>
+        <span class="note">mean over coefficient tokens; other tokens keep <i>w</i> = 1</span>
+        <span class="lab">step</span>
+        <math><msub><mi>Δ</mi><mrow><mi>g</mi><mo>,</mo><mi>d</mi></mrow></msub><mo>=</mo>
+          <mfrac><mrow><mtext>half-range of</mtext><mspace width="0.3em"/><msub><mi>c</mi><mrow><mi>g</mi><mo>,</mo><mi>d</mi></mrow></msub></mrow><mn>127</mn></mfrac></math>
+        <span class="note">per wavelet level <i>g</i> and action dim <i>d</i>, from training data</span>
+        <div class="sep"></div>
+        <span class="lab">why</span>
+        <math><msub><mi>w</mi><mi>t</mi></msub><mo>·</mo><mo>|</mo><mi>b</mi><mo>−</mo><msup><mi>b</mi><mo>*</mo></msup><mo>|</mo>
+          <mo>=</mo><mfrac><mrow><mo>|</mo><mi>δ</mi><msub><mi>c</mi><mi>t</mi></msub><mo>|</mo></mrow><mrow><mi>mean</mi><mo>(</mo><mi>Δ</mi><mo>)</mo></mrow></mfrac></math>
+        <span class="note">orthonormal Haar: |δc| is how far the arm’s path moves</span>
+      </div>
+    </div>
+
+    <div class="panel" style="left:610px;top:146px;width:590px;height:255px">
+      <h2>Finest detail d₁ <span class="tag">±0.02</span></h2>
+    </div>
+    <div class="panel" style="left:610px;top:417px;width:590px;height:255px">
+      <h2>Coarse trend a₃ <span class="tag">±0.02</span></h2>
+    </div>
+
+    <svg id="anim" viewBox="0 0 1280 720" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg>
+    <div class="foot-note" style="right:150px">Illustrative: chunk values and meter readings (+3% vs +20%) show the idea, not values computed from the formula. Step sizes and weights are real.</div>
+  </section>
+</div>
+
+<script src="assets/arm.js"></script>
+<script src="assets/deck.js"></script>
+<script src="assets/charts.js"></script>
+<script>
+const svg = document.getElementById('anim');
+const COEF = [0.426, -0.20, 0.12, -0.09, 0.085, -0.03, 0.04, -0.02];
+const NAMES = ['a₃', 'd₃', 'd₂', 'd₂', 'd₁', 'd₁', 'd₁', 'd₁'];
+const STEP = [0.0622, 0.0392, 0.0222, 0.0222, 0.0090, 0.0090, 0.0090, 0.0090];
+const MEAN = STEP.reduce((a, b) => a + b) / STEP.length;
+const NUDGE = 0.02, PERIOD = 4.5, GMAX = 8, BASE = 5, LENS_DY = 28;
+const ease = u => u * u * (3 - 2 * u);
+// up, hold, back to level, hold, down, hold, back, hold; one period = PERIOD scene seconds
+function profile(t) {
+  const u = (t % PERIOD) / PERIOD * 8, k = Math.floor(u), f = u - k;
+  return [ease(f), 1, 1 - ease(f), 0, -ease(f), -1, -1 + ease(f), 0][k];
+}
+const HOT = '#EA4335', PLAIN = '#9AA0A6';
+
+function gauge(g, CX, CY, R, title, color) {
+  const pt = (v, r = R) => {
+    const a = Math.PI * (1 - Math.min(v, GMAX) / GMAX);
+    return [CX + r * Math.cos(a), CY - r * Math.sin(a)];
+  };
+  const arc = (v0, v1, r = R) => {
+    const [x0, y0] = pt(v0, r), [x1, y1] = pt(v1, r);
+    return `M${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1}`;
+  };
+  el('path', { d: arc(0, GMAX), fill: 'none', stroke: '#ECEDEF', 'stroke-width': 13, 'stroke-linecap': 'round' }, g);
+  const fill = el('path', { fill: 'none', stroke: color, 'stroke-width': 13, 'stroke-linecap': 'round' }, g);
+  for (const v of [0, 2, 4, 6, 8]) {
+    const [lx, ly] = pt(v, R + 16);
+    label(g, lx, ly + 4, v, { 'font-size': 11, fill: '#80868B', 'text-anchor': 'middle' });
+  }
+  const [b0, b1] = pt(BASE, R - 9), [b2, b3] = pt(BASE, R + 9);
+  el('line', { x1: b0, y1: b1, x2: b2, y2: b3, stroke: '#202124', 'stroke-width': 1.5, 'stroke-dasharray': '2 2' }, g);
+  const needle = el('line', { x1: CX, y1: CY, stroke: '#202124', 'stroke-width': 2.6, 'stroke-linecap': 'round' }, g);
+  el('circle', { cx: CX, cy: CY, r: 5, fill: '#202124' }, g);
+  label(g, CX, CY - R - 34, title, { 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 500, fill: color === PLAIN ? '#5F6368' : HOT });
+  const big = label(g, CX, CY + 30, '', { 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 500, fill: color === PLAIN ? '#5F6368' : HOT });
+  const sub = label(g, CX, CY + 48, '', { 'text-anchor': 'middle', 'font-size': 11.5, fill: '#80868B' });
+  return (v, note) => {
+    const [nx, ny] = pt(v, R - 7);
+    needle.setAttribute('x2', nx); needle.setAttribute('y2', ny);
+    fill.setAttribute('d', v > 0.02 ? arc(0, v) : '');
+    big.textContent = v.toFixed(2);
+    sub.textContent = note;
+  };
+}
+
+function row(y0, idx, rise) {
+  const g = el('g', {}, svg);
+  const X0 = 646, BW = 22, GAP = 32, ZY = y0 + 160, SC = 92 / 0.55;
+  el('line', { x1: X0 - 8, x2: X0 + GAP * 8 - 4, y1: ZY, y2: ZY, stroke: '#BDC1C6', 'stroke-width': 1.4 }, g);
+  label(g, X0 - 12, y0 + 60, 'coefficient value', { class: 'ax', 'text-anchor': 'start' });
+  const c0 = COEF[idx], hx = X0 + idx * GAP;
+  el('rect', { x: hx - 5, y: y0 + 70, width: BW + 10, height: 138, rx: 8, fill: '#FCE8E6', opacity: 0.6 }, g);
+  const bars = COEF.map((c, i) => {
+    const x = X0 + i * GAP, hot = i === idx;
+    const r = el('rect', { x, width: BW, rx: 3, fill: hot ? HOT : '#BDC1C6' }, g);
+    label(g, x + BW / 2, y0 + 226, NAMES[i], { 'text-anchor': 'middle', 'font-size': 13,
+      fill: hot ? HOT : '#5F6368', 'font-weight': hot ? 500 : 400 });
+    return r;
+  });
+  const setBar = (r, v) => {
+    const h = Math.max(Math.abs(v) * SC, 1.5);
+    r.setAttribute('y', v >= 0 ? ZY - h : ZY); r.setAttribute('height', h);
+  };
+  COEF.forEach((c, i) => setBar(bars[i], c));
+  const ghost = el('line', { x1: hx - 4, x2: hx + BW + 4, y1: ZY - c0 * SC, y2: ZY - c0 * SC,
+    stroke: '#202124', 'stroke-width': 1.2, 'stroke-dasharray': '3 2' }, g);
+  const valT = label(g, X0 + 8 * GAP - 4, y0 + 60, '', { 'text-anchor': 'end', 'font-size': 12.5, fill: HOT, class: 'mono' });
+
+  const zoom = LENS_DY / (NUDGE * SC);
+  const tipY = ZY - c0 * SC, LX = idx === 0 ? hx + 110 : hx + 66, LY = idx === 0 ? y0 + 88 : y0 + 102, LR = 34;
+  el('line', { x1: hx + BW / 2, y1: tipY, x2: LX - LR * 0.8, y2: LY + LR * 0.5, stroke: '#9AA0A6', 'stroke-width': 1 }, g);
+  el('circle', { cx: hx + BW / 2, cy: tipY, r: 4, fill: 'none', stroke: '#9AA0A6', 'stroke-width': 1 }, g);
+  const cid = 'lens' + idx;
+  el('circle', { id: cid + 'c', cx: LX, cy: LY, r: LR }, el('clipPath', { id: cid }, g));
+  el('circle', { cx: LX, cy: LY, r: LR, fill: '#fff' }, g);
+  const lens = el('g', { 'clip-path': `url(#${cid})` }, g);
+  const zbar = el('rect', { x: LX - 13, width: 26, height: 200, fill: HOT }, lens);
+  el('line', { x1: LX - LR, x2: LX + LR, y1: LY, y2: LY, stroke: '#202124', 'stroke-width': 1.2, 'stroke-dasharray': '3 2' }, lens);
+  el('circle', { cx: LX, cy: LY, r: LR, fill: 'none', stroke: '#5F6368', 'stroke-width': 2 }, g);
+
+  const meter = gauge(g, 1078, y0 + 172, 66, 'scale-aware loss', HOT);
+  const w = STEP[idx] / MEAN;
+
+  return t => {
+    const p = profile(t), dc = NUDGE * p;
+    setBar(bars[idx], c0 + dc);
+    zbar.setAttribute('y', LY - dc * SC * zoom);
+    valT.textContent = `${c0.toFixed(3)} ${dc >= 0 ? '+' : '−'} ${Math.abs(dc).toFixed(4)}`;
+    const v = BASE * (1 + rise * Math.abs(p));
+    meter(v, `+${(rise * Math.abs(p) * 100).toFixed(1)}%  ·  weight ${w.toFixed(2)}`);
+  };
+}
+
+const rows = [row(146, 4, 0.03), row(417, 0, 0.20)];
+startDeck({
+  index: 9, total: 14,
+  prev: '08_formulation.html',
+  next: '10_wavelet_family.html',
+  frame: t => rows.forEach(r => r(t)),
+});
+</script>
+</body>
+</html>
