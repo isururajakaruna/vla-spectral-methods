@@ -429,37 +429,69 @@ def build_nodes():
          "σ was set from the step table, not tuned. It was still chosen for the full-LIBERO run, where 14,500 steps make the slow start "
          "matter less; plain Haar on full LIBERO is planned after it.", short=short)
     fst, fs = run_status("full_s0_dwt_fixed_slw")
-    full = [r for r in (jload(RES / "eval.json") or {"rows": []})["rows"] if r["model"].startswith("full40_")]
-    if fst != "planned" or full:
-        by_suite = {}
-        for r in full:
-            m = "ours" if not r["model"].startswith("full40_ref_") else "pi0fast-libero"
-            suite = r["task"].split("#")[0]
-            k, n = by_suite.get((m, suite), (0, 0))
-            by_suite[(m, suite)] = (k + r["successes"], n + r["episodes"])
-        if by_suite:
-            res = " ".join(f"{m}: " + ", ".join(f"{su.removeprefix('libero_')} {k}/{n}" for (mm, su), (k, n) in by_suite.items() if mm == m) + "."
-                           for m in ("ours", "pi0fast-libero") if any(mm == m for mm, _ in by_suite))
-            short_f = "evaluating" if fst != "done" or len(full) < 80 else "done"
-        else:
-            res = (f"Training: step {fs.get('step', 0)} / {fs.get('stop_at', 14500)}." if fst == "running" and fs else
-                   "Training done; evaluation pending." if fst == "done" else f"State: {fst}.")
-            short_f = "training" if fst == "running" else fst
-        node("FULL", "SLW", "Full LIBERO · 40 tasks, 1 epoch", "done" if len(full) >= 80 else ("failed" if fst == "failed" else "running"),
+    ftot = {}
+    for r in (jload(RES / "eval.json") or {"rows": []})["rows"]:
+        if r["model"].startswith("full40_"):
+            k, n = ftot.get(r["model"], (0, 0))
+            ftot[r["model"]] = (k + r["successes"], n + r["episodes"])
+    fpct = lambda m: 100 * ftot[m][0] / 400 if ftot.get(m, (0, 0))[1] == 400 else None  # noqa: E731
+    f_haar = "full40_dwt_fixed_slw@full_s0_dwt_fixed_slw:step_{:05d}"
+    f_e4 = "full40_{0}@full_e4_{0}:step_58000"
+    f_dct = "full40_dct_fixed@full_s0_dct_fixed:step_{:05d}"
+    f_ref = fpct("full40_ref_pi0fast_libero")
+    ep_steps = ((1, 14500), (2, 29000), (3, 43500), (4, 58000))
+    haar_ep = [(e, fpct(f_haar.format(s))) for e, s in ep_steps[:3]]
+    e4 = [(lab, fpct(f_e4.format(v))) for v, lab in (("dwt_fixed", "plain cross-entropy"), ("dwt_fixed_lw", "weighted"),
+                                                      ("dwt_fixed_slw", "soft + weighted"))]
+    if fst != "planned" or ftot:
+        got = [p for _, p in haar_ep + e4 if p is not None]
+        res = ("Success on the same 400 episodes. Haar DWT fixed: " + ", ".join(f"epoch {e} {p:.1f}%" for e, p in haar_ep if p is not None)
+               + ("; epoch 4 from the epoch-3 checkpoint: " + ", ".join(f"{lab} {p:.1f}%" for lab, p in e4 if p is not None)
+                  if any(p is not None for _, p in e4) else "")
+               + (f". LeRobot π₀-FAST LIBERO: {f_ref:.1f}%." if f_ref is not None else "."))
+        short_f = (f"best {max(got):.0f}% vs π₀-FAST {f_ref:.0f}%" if got and f_ref is not None else "evaluating")
+        node("FULL", "SLW", "Full LIBERO · 40 tasks, epochs 1–4", "done" if haar_ep[2][1] is not None else ("failed" if fst == "failed" else "running"),
              "Every result so far is on one task, and the single-task policies do not generalize. The benchmark that published π₀-FAST "
              "numbers use is all 40 LIBERO tasks, so train once on the full dataset and compare head-to-head with LeRobot's own π₀-FAST "
              "LIBERO checkpoint on the same episodes.",
              "With the same base model and a much smaller budget, does a DWT-token policy match or beat LeRobot's π₀-FAST on all of LIBERO?",
              [("Base model", BASE),
               ("Training data", "All of lerobot/libero @a1aaacb: 40 tasks in four suites (Spatial, Object, Goal, LIBERO-10), 1,525 training "
-               "and 168 validation demos, 232,282 windows. Codec and normalization refitted on these."),
-              ("Training", lora("Haar fixed, soft labels + scale weighting, seed 0; 2-epoch cosine schedule (29,000 steps, warmup 300) "
-                                "paused after epoch 1 at 14,500 steps, so epoch 2 can continue cleanly")),
+               "and 168 validation demos, 232,282 windows (one epoch = 14,500 steps). Codec and normalization refitted on these."),
+              ("Training", lora("Haar fixed, soft labels + scale weighting, seed 0, warmup 300. Epoch 1 under a 29,000-step cosine; epochs 2–3 "
+                                "resumed under 43,500 steps (lr stepped up from 1.1e-4 to 1.6e-4); epoch 4 branched three times from the "
+                                "epoch-3 checkpoint under 58,000 steps (lr 4.6e-5 → 2e-5) with plain cross-entropy, weighting only, and "
+                                "soft labels + weighting")),
               ("Compared with", "lerobot/pi0fast-libero (fully fine-tuned by LeRobot on all of LIBERO), evaluated by us unmodified."),
-              ("Evaluation", "All four suites, every task, initial states 0–9: 400 episodes per model, the same for both.")],
-             res, "Plain-loss Haar was started first (picked by the 3-seed rule) and stopped at step ~700 by decision, to run soft labels "
-             "first; it is paused at step 500 and planned next. 10 episodes per task gives about ±4–5 points on the average; the standard "
-             "protocol uses 50.", short=short_f)
+              ("Evaluation", "All four suites, every task, initial states 0–9: 400 episodes per model, the same for every model.")],
+             res, "Success rose steeply to epoch 3, then epoch 4 changed nothing for any loss (paired p ≥ 0.3), so the recipe plateaus at about "
+             "three quarters; validation token loss bottomed out around epoch 1 while training loss kept falling. The loss variants tie plain "
+             "cross-entropy here too. The ≈13-point gap to π₀-FAST LIBERO is mostly LIBERO-10 (≈57–61% vs 87%). One seed; 10 episodes per "
+             "task gives about ±4 points on the overall rate (the standard protocol uses 50).", short=short_f, link="training_report.html")
+    dst, ds = run_status("full_s0_dct_fixed")
+    dct_ep = [(e, fpct(f_dct.format(s))) for e, s in ep_steps]
+    hmatch = dict(haar_ep + [(4, e4[0][1])])
+    doneep = [(e, p) for e, p in dct_ep if p is not None]
+    res = ("Same 400 episodes. " + ", ".join(f"epoch {e}: DCT {p:.1f}% vs Haar {hmatch[e]:.1f}%" if hmatch.get(e) is not None
+                                              else f"epoch {e}: DCT {p:.1f}%" for e, p in doneep) + "."
+           if doneep else "")
+    if dst == "running" and ds:
+        res += f" Training: step {ds.get('step', 0)} / {ds.get('stop_at', 0)}."
+    node("FDCT", "FULL", "Full LIBERO control · DCT without BPE, 4 epochs", "done" if dct_ep[3][1] is not None else
+         (dst if dst in ("failed", "planned") else "running"),
+         "The Haar policy plateaus 13 points below π₀-FAST LIBERO. On one task, DCT without BPE (FAST's transform with our quantizer, "
+         "vocabulary and grammar) sat between FAST and Haar; training it the same way on all 40 tasks tells whether the wavelet "
+         "transform itself helps at scale, separately from dropping BPE.",
+         "On all of LIBERO, with the same tokens apart from the transform, does Haar beat DCT at every epoch?",
+         [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
+          ("Training", lora("DCT without BPE (dct_fixed), plain cross-entropy, seed 0, warmup 300, exactly the Haar run's learning-rate "
+                            "history (29,000-step cosine for epoch 1, 43,500 for epochs 2–3, 58,000 for epoch 4)")),
+          ("Compared with", "The Haar run at the same epoch (epochs 1–3 soft labels + weighting, epoch 4 plain cross-entropy), and "
+           "π₀-FAST LIBERO."),
+          ("Evaluation", "400 episodes after every epoch, the same as the Haar run.")],
+         res or "Queued after the Haar epoch-2 evaluation.", "Epochs 1–3 of the Haar run used soft labels + weighting while DCT uses plain cross-entropy; on Haar the loss "
+         "made no difference at one task (3 seeds) or at epoch 4 of the full run.",
+         short=(f"DCT {doneep[-1][1]:.0f}% @ epoch {doneep[-1][0]}" if doneep else "queued" if dst == "planned" else "running"), link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",

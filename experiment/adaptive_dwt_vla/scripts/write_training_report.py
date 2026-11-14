@@ -109,6 +109,38 @@ def load_eval():
     return rows, episodes_of
 
 
+FULL_SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
+FULL_REF = "full40_ref_pi0fast_libero"
+FULL_EPOCH = {14500: 1, 29000: 2, 43500: 3, 58000: 4}
+FULL_LOSS = {"dwt_fixed": "plain cross-entropy", "dwt_fixed_lw": "scale-weighted", "dwt_fixed_slw": "soft labels + scale-weighted",
+             "dct_fixed": "plain cross-entropy"}
+
+
+def load_full():
+    """Full-LIBERO evaluations: [(label, name, tokens, epoch, loss, {(suite, task, init): success})], display order."""
+    eps = {}
+    for p in (RES / "eval").glob("full40_*__*.json"):
+        d = json.loads(p.read_text())
+        m = eps.setdefault(d["model"], {})
+        for e in d["episodes"]:
+            m[(d["suite"], d["task_id"], e["init_state"])] = bool(e["success"])
+    out = []
+    for label, m in eps.items():
+        if label == FULL_REF:
+            out.append((label, "π₀-FAST LIBERO (LeRobot, full fine-tune)", "ref", None, "LeRobot's recipe", m))
+            continue
+        g = re.match(r"^full40_(\w+?)@(full_s0|full_e4)_\w+:step_(\d+)$", label)
+        if not g or int(g.group(3)) not in FULL_EPOCH or g.group(1) not in FULL_LOSS:
+            continue
+        v, run, ep = g.group(1), g.group(2), FULL_EPOCH[int(g.group(3))]
+        tok = "dct" if v == "dct_fixed" else "haar"
+        name = (f"DCT, no BPE · epoch {ep}" if tok == "dct" else f"Haar DWT fixed · epoch {ep}"
+                + (" (from epoch 3)" if run == "full_e4" else ""))
+        out.append((label, name, tok, ep, FULL_LOSS[v], m))
+    order = {"haar": 0, "dct": 1, "ref": 2}
+    return sorted(out, key=lambda r: (order[r[2]], r[3] or 0, r[4]))
+
+
 def lc_results(rows, episodes_of):
     pat = re.compile(r"^(\w+)@lc_s(\d+)_\w+:step_(\d+)$")
     res, rowmap = {}, {}
@@ -205,6 +237,41 @@ def plot_success(res):
     return fig_html(fig, "success vs step")
 
 
+def plot_full(full):
+    """Success vs epoch on full LIBERO, overall and LIBERO-10; only models with all 400 episodes."""
+    done = [r for r in full if len(r[5]) == 400]
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)
+    marker = {"plain cross-entropy": "o", "scale-weighted": "s", "soft labels + scale-weighted": "D"}
+    for ax, suites, title in ((axes[0], FULL_SUITES, "all four suites (400 episodes)"), (axes[1], ("libero_10",), "LIBERO-10 (100 episodes)")):
+        def rate(m):
+            ks = [k for k in m if k[0] in suites]
+            return sum(m[k] for k in ks) / len(ks)
+        for tok, color, lab in (("haar", COLOR["dwt_fixed"], "Haar DWT fixed"), ("dct", COLOR["dct_fixed"], "DCT, no BPE")):
+            main = sorted((r[3], rate(r[5])) for r in done if r[2] == tok and (tok == "dct" or r[3] < 4))
+            if main:
+                ax.plot(*zip(*main), "-", color=color, lw=2.2, label=lab if ax is axes[0] else None)
+            for r in done:
+                if r[2] == tok:
+                    ax.plot(r[3], rate(r[5]), marker[r[4]], color=color, ms=7, mfc="white" if r[4] != "plain cross-entropy" else color)
+            e4 = [r for r in done if r[2] == "haar" and r[3] == 4]
+            if tok == "haar" and main and e4:
+                for r in e4:
+                    ax.plot([main[-1][0], 4], [main[-1][1], rate(r[5])], ":", color=color, lw=1)
+        for r in done:
+            if r[2] == "ref":
+                ax.axhline(rate(r[5]), color="#555", ls="--", lw=1.4, label="π₀-FAST LIBERO (LeRobot)" if ax is axes[0] else None)
+        ax.set_xticks([1, 2, 3, 4])
+        ax.set_xlabel("epoch (14,500 optimizer steps each)")
+        ax.set_title(title)
+        ax.grid(alpha=0.3)
+    axes[0].set_ylabel("closed-loop success rate")
+    for lab, mk in marker.items():
+        axes[1].plot([], [], mk, color="#777", mfc="white" if lab != "plain cross-entropy" else "#777", label=f"loss: {lab}")
+    axes[1].legend(fontsize=7.5, loc="lower right")
+    axes[0].legend(fontsize=7.5, loc="lower right")
+    return fig_html(fig, "full LIBERO success vs epoch")
+
+
 def plot_pilot(pilot):
     fig, axes = plt.subplots(1, 2, figsize=(13, 3.8))
     for v, r in pilot.items():
@@ -299,6 +366,13 @@ def main() -> None:
         add(f"<p>Changing only the loss on Haar fixed (section 6b): soft labels plus weighting by coefficient scale reached {k_s}/{20 * len(ss)} "
             f"at 2000 steps over {len(ss)} seed(s) against {k_p}/{20 * len(ss)} with plain cross-entropy, same token count: no significant "
             "difference, and slower learning in mid-training.</p>")
+    full_h = [r for r in load_full() if len(r[5]) == 400]
+    hbest = max((r for r in full_h if r[2] == "haar"), key=lambda r: sum(r[5].values()), default=None)
+    href = next((r for r in full_h if r[2] == "ref"), None)
+    if hbest and href:
+        add(f"<p>On all 40 LIBERO tasks (section 7b), Haar DWT fixed reached at best {sum(hbest[5].values()) / 4:.1f}% ({esc(hbest[1])}, "
+            f"{esc(hbest[4])}) against {sum(href[5].values()) / 4:.1f}% for LeRobot's fully fine-tuned π₀-FAST LIBERO on the same 400 episodes. "
+            "Success plateaued after three epochs, the loss choice made no difference, and most of the gap is on the long LIBERO-10 tasks.</p>")
 
     # ---- setup
     add("<h2>1. What was trained</h2>")
@@ -622,14 +696,89 @@ def main() -> None:
                if sig else "No difference is significant with one seed and 45 episodes. ")
             + "A real generalization test needs multi-task training.</p>")
 
+    # ---- full LIBERO
+    full = load_full()
+    if full:
+        add("<h2>7b. Full LIBERO: all 40 tasks, accuracy per epoch</h2>")
+        add("<p>Every result above is on one task. To compare with published π₀-FAST numbers, Haar DWT fixed was trained once on all of "
+            "<code>lerobot/libero</code> (40 tasks in four suites, 1,525 training demos, 232,282 windows, codec and normalization refitted) with "
+            "the same LoRA recipe (rank 16, 20.85 M trainable parameters, effective batch 16, peak lr 2·10⁻⁴, warmup 300; one epoch = 14,500 steps). "
+            "The schedule was extended as the run went: epoch 1 under a 29,000-step cosine, epochs 2–3 under 43,500 steps (resumed, lr stepped up "
+            "from 1.1·10⁻⁴ to 1.6·10⁻⁴), and epoch 4 under 58,000 steps, branched three times from the epoch-3 checkpoint with a different loss "
+            "each (lr 4.6·10⁻⁵ decaying to 2·10⁻⁵). Epochs 1–3 used soft labels + scale weighting. The DCT control (no BPE, plain cross-entropy) "
+            "repeats exactly this learning-rate history from scratch. Every model is evaluated on the same 400 episodes: all four suites, every "
+            "task, initial states 0–9, suite-default step limits (Spatial/Object 280, Goal 300, LIBERO-10 520). LeRobot's "
+            "<code>lerobot/pi0fast-libero</code> (full fine-tune on all of LIBERO) was evaluated by us, unmodified, on the same episodes.</p>")
+        add(plot_full(full))
+        body = []
+        for label, name, tok, ep, loss, m in full:
+            row = [esc(name), esc(loss)]
+            if len(m) < 400:
+                body.append(row + ["–"] * 4 + [f"evaluating ({len(m)}/400 episodes)"])
+                continue
+            for su in FULL_SUITES:
+                ks = [k for k in m if k[0] == su]
+                row.append((f"{100 * sum(m[k] for k in ks) / len(ks):.0f}%" + ("" if len(ks) == 100 else f" ({len(ks)} eps)")) if ks else "–")
+            k, n = sum(m.values()), len(m)
+            row.append(f"<b>{100 * k / n:.1f}%</b> ({k}/{n})")
+            body.append(row)
+        add(table(["model", "loss", "Spatial", "Object", "Goal", "LIBERO-10", "overall"], body))
+
+        def pair(a, b):
+            ks = a.keys() & b.keys()
+            x, y = sum(a[k] and not b[k] for k in ks), sum(b[k] and not a[k] for k in ks)
+            return f"{x} / {y}, p = {mcnemar_exact(x, y):.2g}"
+
+        complete = [r for r in full if len(r[5]) == 400]
+        ref = next((r[5] for r in complete if r[2] == "ref"), None)
+        haar = {r[3]: r[5] for r in complete if r[2] == "haar" and (r[3] < 4 or r[4] == "plain cross-entropy")}
+        pbody = []
+        for label, name, tok, ep, loss, m in complete:
+            if tok == "ref":
+                continue
+            same = "–"
+            if tok == "dct" and ep in haar:
+                same = pair(m, haar[ep])
+            elif tok == "haar" and ep == 4 and 3 in haar:
+                same = pair(m, haar[3]) + " (vs epoch 3)"
+            pbody.append([esc(name), esc(loss), pair(m, ref) if ref else "–", same])
+        add("<h3>Paired tests on the same episodes (exact McNemar; episodes won only by the row model / only by the other)</h3>")
+        add(table(["model", "loss", "vs π₀-FAST LIBERO", "vs Haar, same epoch (Haar epoch 4: plain loss)"], pbody))
+
+        def pct(m):
+            return f"{100 * sum(m.values()) / len(m):.1f}%"
+        done = [r for r in full if len(r[5]) == 400]
+        hs = ", ".join(f"epoch {r[3]} {pct(r[5])}" for r in done if r[2] == "haar" and r[3] < 4)
+        e4 = ", ".join(f"{r[4]} {pct(r[5])}" for r in done if r[2] == "haar" and r[3] == 4)
+        ds = ", ".join(f"epoch {r[3]} {pct(r[5])}" for r in done if r[2] == "dct")
+        add(f"<p>Haar DWT fixed: {hs}; epoch 4 from the epoch-3 checkpoint: {e4}. "
+            + (f"π₀-FAST LIBERO: {pct(ref)}. " if ref else "")
+            + (f"DCT without BPE (control): {ds}. " if ds else "The DCT control is still training or evaluating; its rows appear as epochs finish. ")
+            + "Success rose steeply over the first epochs, then the fourth epoch changed nothing for any of the three losses (paired p ≥ 0.3 "
+            "against each other and against epoch 3): this recipe plateaus at about three quarters of the episodes. The validation token loss had "
+            "bottomed out around the end of epoch 1 (≈2.02) and rose to 2.12 by the end of epoch 3 while the training loss kept falling, so the "
+            "adapter increasingly fits the training demos rather than generalizing; closed-loop success still improved until epoch 3. The loss "
+            "variants that tied plain cross-entropy on one task also tie it here. The gap to the fully fine-tuned π₀-FAST LIBERO is about 13 "
+            "points and lies mostly in LIBERO-10 (long, two-step tasks), where errors accumulate over up to 520 steps; Goal is closest. "
+            "One seed and 10 episodes per task (95% interval about ±4 points on the overall rate); the standard LIBERO protocol uses 50.</p>")
+
     # ---- weights
     add("<h2>8. Released LoRA weights</h2>")
     add("<p>Adapter-only checkpoints (LoRA + action-row adapters, fp32 safetensors) plus <code>meta.json</code> (codec parameters, normalization statistics, base-model revision). "
         "The frozen base model is downloaded from Hugging Face on load. Stored in git with Git LFS under <code>experiment/adaptive_dwt_vla/weights/</code>.</p>")
     body = []
     pilot_rows = {r["model"]: r for r in rows}
+    full_ok = {r[0]: r for r in (full or [])}
     for d in sorted(WEIGHTS.glob("*/adapters.safetensors")):
         name = d.parent.name
+        fw = re.match(r"^(full_s0|full_e4)_(\w+?)_step_(\d+)$", name)
+        if fw:
+            r = full_ok.get(f"full40_{fw.group(2)}@{fw.group(1)}_{fw.group(2)}:step_{int(fw.group(3)):05d}")
+            succ = f"{sum(r[5].values())}/{len(r[5])} (full LIBERO)" if r else "–"
+            lab = ("DCT, no BPE" if fw.group(2) == "dct_fixed" else "Haar DWT fixed") + f", all 40 tasks, {FULL_LOSS.get(fw.group(2), fw.group(2))}"
+            body.append([f"<code>weights/{esc(name)}</code>", esc(lab), int(fw.group(3)), f"{d.stat().st_size / 1e6:.1f} MB", succ,
+                         f"<code>{sha256(d)[:16]}…</code>"])
+            continue
         m = re.match(r"^(lc_s(\d+)|pilot)_(\w+?)_step_(\d+)$", name)
         if not m:
             continue
@@ -640,7 +789,7 @@ def main() -> None:
             r = pilot_rows.get(f"{v}@pilot_{v}:step_{step:05d}")
         succ = f"{r['successes']}/{r['episodes']}" if r else "–"
         body.append([f"<code>weights/{esc(name)}</code>", esc(LABEL.get(v, dict(FOLLOW_UPS).get(v, v))), step, f"{d.stat().st_size / 1e6:.1f} MB", succ, f"<code>{sha256(d)[:16]}…</code>"])
-    add(table(["path", "variant", "step", "adapter size", "success (20 eps)", "sha256"], body))
+    add(table(["path", "variant", "step", "adapter size", "success (20 eps on the training task, or 400 on full LIBERO)", "sha256"], body))
     add("<p>Load one for inference:</p><pre>from lerobot_policy_adaptive_dwt.modeling_adaptive_dwt import load_checkpoint\n"
         "policy, meta = load_checkpoint(\"experiment/adaptive_dwt_vla/weights/lc_s2_dwt_fixed_step_02000\")</pre>")
     add("<p>The web studio exposes <code>lc_s2_dwt_fixed_step_02000</code> and <code>lc_s2_dwt_adaptive_step_02000</code> as “π₀-FAST + DWT (fixed / adaptive)”.</p>")
@@ -680,8 +829,8 @@ def main() -> None:
     # ---- caveats
     add("<h2>10. Caveats</h2><ul>")
     for c in [
-        "One task and one instruction. The zero-shot probe on nine new objects (section 7) mostly fails for every model, so nothing here says how "
-        "the tokenizers behave in multi-task training or on other robots.",
+        "Sections 1–7 use one task and one instruction, and the zero-shot probe on nine new objects (section 7) mostly fails for every model. "
+        "The multi-task results (section 7b) are one seed with 10 episodes per task; nothing here covers other robots.",
         "20 episodes per checkpoint and 3 seeds: confidence intervals are wide, and the paired tests are not corrected for multiple comparisons.",
         "The FAST baseline learns LIBERO FAST tokens through the same small LoRA budget. Its low value-token accuracy and malformed streams suggest part of the gap is "
         "how hard BPE tokens are to adapt under this recipe; the fully fine-tuned reference shows FAST itself can solve the task. This was tested directly: "
@@ -698,6 +847,9 @@ def main() -> None:
         "bash scripts/run_learning_curve.sh 0 1 2      # 9 runs × 2000 steps + checkpoint evals (≈24 h on one A6000)\n"
         "bash scripts/run_variant.sh dct_fixed 0        # follow-up runs: dwt_fixed_bpe, dct_fixed (seeds 0-2), dwt_fixed_s4h, dwt_fixed_lw, dwt_fixed_slw\n"
         "bash scripts/run_generalization.sh 0 dwt_fixed dwt_fixed_s4h dct_fixed dwt_adaptive dwt_fixed_lw dwt_fixed_slw   # section 7\n"
+        "bash scripts/run_full_libero.sh dwt_fixed_slw  # section 7b, epoch 1; then STEPS=43500 STOP=29000 and STOP=43500 for epochs 2-3\n"
+        "bash scripts/run_full_e4_lw.sh dwt_fixed       # epoch 4 from the epoch-3 checkpoint (also dwt_fixed_lw, dwt_fixed_slw)\n"
+        "bash scripts/run_full_dct_control.sh           # DCT without BPE, 4 epochs with the same lr history, eval after each\n"
         "$PY scripts/write_reports.py codec summary\n"
         "$PY scripts/write_training_report.py          # this file</pre>")
     add("</body></html>")

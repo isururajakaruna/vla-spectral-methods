@@ -111,6 +111,12 @@ variants, which train the same Haar tokens with `--soft-sigma` soft labels and/o
 base-model revision). Run `git lfs install && git lfs pull` after cloning, then load with
 `load_checkpoint("weights/lc_s2_dwt_fixed_step_02000")`; the frozen base model comes from Hugging Face.
 
+The full-LIBERO policies (all 40 tasks, one epoch = 14,500 steps) are under `weights/full_*`: Haar DWT fixed after
+epochs 1–3 (`full_s0_dwt_fixed_slw_step_{14500,29000,43500}`), the three epoch-4 branches from the epoch-3 checkpoint
+(`full_e4_{dwt_fixed,dwt_fixed_lw,dwt_fixed_slw}_step_58000`), and the DCT-without-BPE control after each epoch
+(`full_s0_dct_fixed_step_*`, added as `scripts/run_full_dct_control.sh` finishes). Every intermediate checkpoint of
+these runs stays in `runs/` and is mirrored to the data partition; success per epoch is in section 7b of the report.
+
 `../reports/training_report.html` is a self-contained report (setup, compute, curves, closed-loop success, released
 weights, wavelet choice), rebuilt from `runs/` and `results/` by `python scripts/write_training_report.py`;
 `../reports/wavelet_selection.html` (offline comparison of 26 wavelet transforms) by `python scripts/wavelet_selection.py`. `runs/`, `data_cache/`,
