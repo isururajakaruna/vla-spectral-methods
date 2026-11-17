@@ -133,11 +133,11 @@ def load_full():
         if not g or int(g.group(3)) not in FULL_EPOCH or g.group(1) not in FULL_LOSS:
             continue
         v, run, ep = g.group(1), g.group(2), FULL_EPOCH[int(g.group(3))]
-        tok = "dct" if v == "dct_fixed" else "haar"
-        name = (f"DCT, no BPE · epoch {ep}" if tok == "dct" else f"Haar DWT fixed · epoch {ep}"
-                + (" (from epoch 3)" if run == "full_e4" else ""))
+        tok = "dct" if v == "dct_fixed" else "haarp" if (run, v) == ("full_s0", "dwt_fixed") else "haar"
+        name = {"dct": f"DCT, no BPE · epoch {ep}", "haarp": f"Haar DWT fixed, plain from scratch · epoch {ep}",
+                "haar": f"Haar DWT fixed · epoch {ep}" + (" (from epoch 3)" if run == "full_e4" else "")}[tok]
         out.append((label, name, tok, ep, FULL_LOSS[v], m))
-    order = {"haar": 0, "dct": 1, "ref": 2}
+    order = {"haar": 0, "haarp": 1, "dct": 2, "ref": 3}
     return sorted(out, key=lambda r: (order[r[2]], r[3] or 0, r[4]))
 
 
@@ -246,8 +246,9 @@ def plot_full(full):
         def rate(m):
             ks = [k for k in m if k[0] in suites]
             return sum(m[k] for k in ks) / len(ks)
-        for tok, color, lab in (("haar", COLOR["dwt_fixed"], "Haar DWT fixed"), ("dct", COLOR["dct_fixed"], "DCT, no BPE")):
-            main = sorted((r[3], rate(r[5])) for r in done if r[2] == tok and (tok == "dct" or r[3] < 4))
+        for tok, color, lab in (("haar", COLOR["dwt_fixed"], "Haar DWT fixed (epochs 1–3 soft + weighted)"),
+                                ("haarp", "#7b4fc9", "Haar DWT fixed, plain from scratch"), ("dct", COLOR["dct_fixed"], "DCT, no BPE")):
+            main = sorted((r[3], rate(r[5])) for r in done if r[2] == tok and (tok != "haar" or r[3] < 4))
             if main:
                 ax.plot(*zip(*main), "-", color=color, lw=2.2, label=lab if ax is axes[0] else None)
             for r in done:
@@ -367,12 +368,16 @@ def main() -> None:
             f"at 2000 steps over {len(ss)} seed(s) against {k_p}/{20 * len(ss)} with plain cross-entropy, same token count: no significant "
             "difference, and slower learning in mid-training.</p>")
     full_h = [r for r in load_full() if len(r[5]) == 400]
-    hbest = max((r for r in full_h if r[2] == "haar"), key=lambda r: sum(r[5].values()), default=None)
+    hbest = max((r for r in full_h if r[2] in ("haar", "haarp")), key=lambda r: sum(r[5].values()), default=None)
     href = next((r for r in full_h if r[2] == "ref"), None)
+    d1 = next((r for r in full_h if r[2] == "dct" and r[3] == 1), None)
+    h1 = next((r for r in full_h if r[2] == "haar" and r[3] == 1), None)
     if hbest and href:
         add(f"<p>On all 40 LIBERO tasks (section 7b), Haar DWT fixed reached at best {sum(hbest[5].values()) / 4:.1f}% ({esc(hbest[1])}, "
             f"{esc(hbest[4])}) against {sum(href[5].values()) / 4:.1f}% for LeRobot's fully fine-tuned π₀-FAST LIBERO on the same 400 episodes. "
-            "Success plateaued after three epochs, the loss choice made no difference, and most of the gap is on the long LIBERO-10 tasks.</p>")
+            "Success plateaued after three epochs, the loss choice made no difference at epoch 4, and most of the gap is on the long LIBERO-10 tasks."
+            + (f" DCT without BPE reached {sum(d1[5].values()) / 4:.1f}% after its first epoch (Haar run with soft labels + weighting: "
+               f"{sum(h1[5].values()) / 4:.1f}%); a plain-cross-entropy Haar run separates transform from loss." if d1 and h1 else "") + "</p>")
 
     # ---- setup
     add("<h2>1. What was trained</h2>")
@@ -706,7 +711,8 @@ def main() -> None:
             "The schedule was extended as the run went: epoch 1 under a 29,000-step cosine, epochs 2–3 under 43,500 steps (resumed, lr stepped up "
             "from 1.1·10⁻⁴ to 1.6·10⁻⁴), and epoch 4 under 58,000 steps, branched three times from the epoch-3 checkpoint with a different loss "
             "each (lr 4.6·10⁻⁵ decaying to 2·10⁻⁵). Epochs 1–3 used soft labels + scale weighting. The DCT control (no BPE, plain cross-entropy) "
-            "repeats exactly this learning-rate history from scratch. Every model is evaluated on the same 400 episodes: all four suites, every "
+            "repeats exactly this learning-rate history from scratch, and so does a plain-cross-entropy Haar run (2 epochs) that separates the "
+            "transform from the loss. Every model is evaluated on the same 400 episodes: all four suites, every "
             "task, initial states 0–9, suite-default step limits (Spatial/Object 280, Goal 300, LIBERO-10 520). LeRobot's "
             "<code>lerobot/pi0fast-libero</code> (full fine-tune on all of LIBERO) was evaluated by us, unmodified, on the same episodes.</p>")
         add(plot_full(full))
@@ -732,18 +738,22 @@ def main() -> None:
         complete = [r for r in full if len(r[5]) == 400]
         ref = next((r[5] for r in complete if r[2] == "ref"), None)
         haar = {r[3]: r[5] for r in complete if r[2] == "haar" and (r[3] < 4 or r[4] == "plain cross-entropy")}
+        haarp = {r[3]: r[5] for r in complete if r[2] == "haarp"}
         pbody = []
         for label, name, tok, ep, loss, m in complete:
             if tok == "ref":
                 continue
-            same = "–"
-            if tok == "dct" and ep in haar:
-                same = pair(m, haar[ep])
-            elif tok == "haar" and ep == 4 and 3 in haar:
-                same = pair(m, haar[3]) + " (vs epoch 3)"
-            pbody.append([esc(name), esc(loss), pair(m, ref) if ref else "–", same])
+            c1 = c2 = "–"
+            if tok == "haar" and ep == 4 and 3 in haar:
+                c1 = pair(m, haar[3]) + " (vs epoch 3)"
+            elif tok in ("dct", "haarp") and ep in haar:
+                c1 = pair(m, haar[ep])
+            if tok == "dct" and ep in haarp:
+                c2 = pair(m, haarp[ep])
+            pbody.append([esc(name), esc(loss), pair(m, ref) if ref else "–", c1, c2])
         add("<h3>Paired tests on the same episodes (exact McNemar; episodes won only by the row model / only by the other)</h3>")
-        add(table(["model", "loss", "vs π₀-FAST LIBERO", "vs Haar, same epoch (Haar epoch 4: plain loss)"], pbody))
+        add(table(["model", "loss", "vs π₀-FAST LIBERO", "vs Haar soft + weighted, same epoch (epoch 4: plain branch)",
+                   "vs Haar plain from scratch, same epoch"], pbody))
 
         def pct(m):
             return f"{100 * sum(m.values()) / len(m):.1f}%"
@@ -751,10 +761,23 @@ def main() -> None:
         hs = ", ".join(f"epoch {r[3]} {pct(r[5])}" for r in done if r[2] == "haar" and r[3] < 4)
         e4 = ", ".join(f"{r[4]} {pct(r[5])}" for r in done if r[2] == "haar" and r[3] == 4)
         ds = ", ".join(f"epoch {r[3]} {pct(r[5])}" for r in done if r[2] == "dct")
+        ps = ", ".join(f"epoch {r[3]} {pct(r[5])}" for r in done if r[2] == "haarp")
+        dct1 = next((r[5] for r in done if r[2] == "dct" and r[3] == 1), None)
+        dct_note = ""
+        if dct1 is not None and 1 in haar:
+            x, y = sum(dct1[k] and not haar[1][k] for k in dct1), sum(haar[1][k] and not dct1[k] for k in dct1)
+            dct_note = (f"After one epoch DCT without BPE is far ahead of the Haar run ({pct(dct1)} vs {pct(haar[1])}, {x} vs {y} episodes won "
+                        f"alone, p = {mcnemar_exact(x, y):.1g}) and already matches Haar's best after four epochs, the reverse of the single-task "
+                        "result. The Haar run used soft labels + weighting in epochs 1–3, which learned more slowly in mid-training on one task, so "
+                        "this gap mixes transform and loss until the plain-cross-entropy Haar run is in. ")
         add(f"<p>Haar DWT fixed: {hs}; epoch 4 from the epoch-3 checkpoint: {e4}. "
             + (f"π₀-FAST LIBERO: {pct(ref)}. " if ref else "")
             + (f"DCT without BPE (control): {ds}. " if ds else "The DCT control is still training or evaluating; its rows appear as epochs finish. ")
-            + "Success rose steeply over the first epochs, then the fourth epoch changed nothing for any of the three losses (paired p ≥ 0.3 "
+            + (f"Haar with plain cross-entropy from scratch: {ps}. " if ps else "Haar with plain cross-entropy from scratch (2 epochs) is queued "
+               "after DCT epoch 2; it separates the transform from the loss, since epochs 1–3 of the main Haar run used soft labels + weighting "
+               "and DCT uses plain cross-entropy. ")
+            + dct_note
+            + "For Haar, success rose steeply over the first epochs, then the fourth epoch changed nothing for any of the three losses (paired p ≥ 0.3 "
             "against each other and against epoch 3): this recipe plateaus at about three quarters of the episodes. The validation token loss had "
             "bottomed out around the end of epoch 1 (≈2.02) and rose to 2.12 by the end of epoch 3 while the training loss kept falling, so the "
             "adapter increasingly fits the training demos rather than generalizing; closed-loop success still improved until epoch 3. The loss "

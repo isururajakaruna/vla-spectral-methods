@@ -119,7 +119,9 @@ these runs stays in `runs/` and is mirrored to the data partition; success per e
 
 `../reports/training_report.html` is a self-contained report (setup, compute, curves, closed-loop success, released
 weights, wavelet choice), rebuilt from `runs/` and `results/` by `python scripts/write_training_report.py`;
-`../reports/wavelet_selection.html` (offline comparison of 26 wavelet transforms) by `python scripts/wavelet_selection.py`. `runs/`, `data_cache/`,
+`../reports/wavelet_selection.html` (offline comparison of 26 wavelet transforms) by `python scripts/wavelet_selection.py`;
+`../reports/transform_shift_analysis.html` (synthetic: how many tokens a visible edit of a smooth motion shifts under 18
+transforms) by `python scripts/transform_shift_analysis.py`. `runs/`, `data_cache/`,
 rollout videos, logs and dataset-derived example plots are not committed.
 
 ## Known limitations

@@ -1,0 +1,4461 @@
+{
+ "sizes": [
+  16,
+  32,
+  64
+ ],
+ "steps": [
+  0.01,
+  0.02,
+  0.05
+ ],
+ "main_step": 0.02,
+ "n_shapes": 400,
+ "edits": [
+  "slope up",
+  "slope down",
+  "offset",
+  "growing amplitude",
+  "decaying amplitude",
+  "added curvature",
+  "local bump",
+  "time shift (delay 6%)",
+  "frequency drift (time warp)"
+ ],
+ "results": {
+  "16": {
+   "raw samples": {
+    "family": "baseline",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 0.99265625,
+      "shifted_sd": 0.020125946212228137,
+      "n90": 9.0,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.91984375
+     },
+     "slope down": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 0.99234375,
+      "shifted_sd": 0.020962554971603535,
+      "n90": 9.0,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.92046875
+     },
+     "offset": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 1.0,
+      "shifted_sd": 0.0,
+      "n90": 15.0,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 1.0
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.9746875,
+      "shifted@0.02": 0.95,
+      "shifted_sd": 0.054486236794258416,
+      "n90": 6.8,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.865
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.97265625,
+      "shifted@0.02": 0.9321875,
+      "shifted_sd": 0.059384045363632815,
+      "n90": 6.8,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.853125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.93578125,
+      "shifted@0.02": 0.905625,
+      "shifted_sd": 0.037494791304926604,
+      "n90": 9.0,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.85265625
+     },
+     "local bump": {
+      "shifted@0.01": 0.365,
+      "shifted@0.02": 0.3390625,
+      "shifted_sd": 0.035869500885153116,
+      "n90": 3.0,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.2940625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.9825,
+      "shifted@0.02": 0.968125,
+      "shifted_sd": 0.07207580644710124,
+      "n90": 9.05,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.93
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.96796875,
+      "shifted@0.02": 0.94296875,
+      "shifted_sd": 0.08431349031108545,
+      "n90": 7.4525,
+      "nonzero": 0.99296875,
+      "shifted@0.05": 0.8796875
+     }
+    },
+    "shifted@0.01": 0.9109548611111111,
+    "shifted@0.02": 0.8914409722222223,
+    "shifted@0.05": 0.8349826388888889,
+    "n90": 8.344722222222224,
+    "nonzero": 0.9929687499999998
+   },
+   "DCT-II": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.33546875,
+      "shifted@0.02": 0.26859375,
+      "shifted_sd": 0.05112002382567422,
+      "n90": 1.0,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.18625
+     },
+     "slope down": {
+      "shifted@0.01": 0.33171875,
+      "shifted@0.02": 0.26640625,
+      "shifted_sd": 0.04955244026218587,
+      "n90": 1.0,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.18546875
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.74859375,
+      "shifted@0.02": 0.639375,
+      "shifted_sd": 0.15869462616925628,
+      "n90": 3.16,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.4990625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.71390625,
+      "shifted@0.02": 0.6125,
+      "shifted_sd": 0.15200483133769138,
+      "n90": 3.16,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.468125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.375625,
+      "shifted@0.02": 0.3059375,
+      "shifted_sd": 0.04502494968070481,
+      "n90": 1.0,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.20640625
+     },
+     "local bump": {
+      "shifted@0.01": 0.905,
+      "shifted@0.02": 0.82015625,
+      "shifted_sd": 0.0672418021838908,
+      "n90": 5.7325,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.67875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.71421875,
+      "shifted@0.02": 0.62625,
+      "shifted_sd": 0.1558695367927935,
+      "n90": 3.0575,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.5
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.7503125,
+      "shifted@0.02": 0.6528125,
+      "shifted_sd": 0.13083229663867404,
+      "n90": 3.4825,
+      "nonzero": 0.709375,
+      "shifted@0.05": 0.51765625
+     }
+    },
+    "shifted@0.01": 0.5485937499999999,
+    "shifted@0.02": 0.4727256944444444,
+    "shifted@0.05": 0.36713541666666666,
+    "n90": 2.510277777777778,
+    "nonzero": 0.709375
+   },
+   "DST-II": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 4.0,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.5
+     },
+     "slope down": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 4.0,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.5
+     },
+     "offset": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.5
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.9790625,
+      "shifted@0.02": 0.954375,
+      "shifted_sd": 0.1212258352208802,
+      "n90": 6.305,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.89875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.971875,
+      "shifted@0.02": 0.94609375,
+      "shifted_sd": 0.1369818896275617,
+      "n90": 6.305,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.88515625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 6.0,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.5
+     },
+     "local bump": {
+      "shifted@0.01": 0.8578125,
+      "shifted@0.02": 0.77171875,
+      "shifted_sd": 0.08020344614439892,
+      "n90": 5.105,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.6390625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.933125,
+      "shifted@0.02": 0.879375,
+      "shifted_sd": 0.1487591908925294,
+      "n90": 3.545,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.7528125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.69484375,
+      "shifted@0.02": 0.58703125,
+      "shifted_sd": 0.16821029144626526,
+      "n90": 2.8225,
+      "nonzero": 0.93046875,
+      "shifted@0.05": 0.468125
+     }
+    },
+    "shifted@0.01": 0.7151909722222223,
+    "shifted@0.02": 0.6820659722222221,
+    "shifted@0.05": 0.6271006944444444,
+    "n90": 4.453611111111111,
+    "nonzero": 0.9304687499999998
+   },
+   "real DFT": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.9375,
+      "shifted@0.02": 0.9375,
+      "shifted_sd": 0.0,
+      "n90": 8.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.8953125
+     },
+     "slope down": {
+      "shifted@0.01": 0.9375,
+      "shifted@0.02": 0.9375,
+      "shifted_sd": 0.0,
+      "n90": 8.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.894375
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.960625,
+      "shifted@0.02": 0.9315625,
+      "shifted_sd": 0.12048040232232793,
+      "n90": 4.4,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.84125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.95890625,
+      "shifted@0.02": 0.916875,
+      "shifted_sd": 0.12795110149975264,
+      "n90": 4.4,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.8053125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.67296875,
+      "shifted@0.02": 0.5440625,
+      "shifted_sd": 0.07134245646002106,
+      "n90": 2.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.35
+     },
+     "local bump": {
+      "shifted@0.01": 0.8853125,
+      "shifted@0.02": 0.8075,
+      "shifted_sd": 0.08335260193899169,
+      "n90": 5.3775,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.661875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.8990625,
+      "shifted@0.02": 0.84609375,
+      "shifted_sd": 0.16622642866264528,
+      "n90": 3.405,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.69390625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.72375,
+      "shifted@0.02": 0.63484375,
+      "shifted_sd": 0.15248839287282656,
+      "n90": 3.1425,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.4965625
+     }
+    },
+    "shifted@0.01": 0.7820138888888889,
+    "shifted@0.02": 0.7353819444444444,
+    "shifted@0.05": 0.6334548611111112,
+    "n90": 4.413888888888888,
+    "nonzero": 0.97328125
+   },
+   "Walsh\u2013Hadamard": {
+    "family": "other",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.25,
+      "shifted@0.02": 0.25,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.25
+     },
+     "slope down": {
+      "shifted@0.01": 0.25,
+      "shifted@0.02": 0.25,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.25
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.95453125,
+      "shifted@0.02": 0.90453125,
+      "shifted_sd": 0.08171128072939195,
+      "n90": 4.6925,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.79546875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.94125,
+      "shifted@0.02": 0.8965625,
+      "shifted_sd": 0.07895744007850052,
+      "n90": 4.6925,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.76484375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.38453125,
+      "shifted@0.02": 0.37625,
+      "shifted_sd": 0.019724667297574373,
+      "n90": 3.0,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.31890625
+     },
+     "local bump": {
+      "shifted@0.01": 0.88546875,
+      "shifted@0.02": 0.83546875,
+      "shifted_sd": 0.08877296687864779,
+      "n90": 7.21,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.7553125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.9240625,
+      "shifted@0.02": 0.8796875,
+      "shifted_sd": 0.12607932460855745,
+      "n90": 4.2975,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.76296875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.90421875,
+      "shifted@0.02": 0.8615625,
+      "shifted_sd": 0.09172340810147646,
+      "n90": 4.7025,
+      "nonzero": 0.94953125,
+      "shifted@0.05": 0.7565625
+     }
+    },
+    "shifted@0.01": 0.6173958333333334,
+    "shifted@0.02": 0.5907291666666666,
+    "shifted@0.05": 0.5240625,
+    "n90": 3.7327777777777778,
+    "nonzero": 0.9495312500000002
+   },
+   "orthogonal polynomials": {
+    "family": "polynomial",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.0625
+     },
+     "slope down": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.0625
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.594375,
+      "shifted@0.02": 0.54203125,
+      "shifted_sd": 0.12406279518226848,
+      "n90": 3.45,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.46390625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.57921875,
+      "shifted@0.02": 0.52875,
+      "shifted_sd": 0.12043865139563795,
+      "n90": 3.45,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.45015625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.07203125,
+      "shifted@0.02": 0.06625,
+      "shifted_sd": 0.014842927608797397,
+      "n90": 1.0,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.06421875
+     },
+     "local bump": {
+      "shifted@0.01": 0.9378125,
+      "shifted@0.02": 0.885625,
+      "shifted_sd": 0.08235071720999157,
+      "n90": 7.0425,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.77375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.64421875,
+      "shifted@0.02": 0.5890625,
+      "shifted_sd": 0.1617696930631631,
+      "n90": 3.685,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.51046875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.6859375,
+      "shifted@0.02": 0.63515625,
+      "shifted_sd": 0.14335671404206188,
+      "n90": 4.205,
+      "nonzero": 0.59796875,
+      "shifted@0.05": 0.55390625
+     }
+    },
+    "shifted@0.01": 0.4112326388888889,
+    "shifted@0.02": 0.38159722222222225,
+    "shifted@0.05": 0.3337673611111111,
+    "n90": 2.870277777777778,
+    "nonzero": 0.59796875
+   },
+   "PCA (learned)": {
+    "family": "data-driven",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.42984375,
+      "shifted@0.02": 0.35328125,
+      "shifted_sd": 0.05751167510547315,
+      "n90": 1.0,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.2909375
+     },
+     "slope down": {
+      "shifted@0.01": 0.430625,
+      "shifted@0.02": 0.348125,
+      "shifted_sd": 0.053949484473903915,
+      "n90": 1.0,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.2884375
+     },
+     "offset": {
+      "shifted@0.01": 0.42453125,
+      "shifted@0.02": 0.39515625,
+      "shifted_sd": 0.032082276430102336,
+      "n90": 2.0,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.37140625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.5884375,
+      "shifted@0.02": 0.52640625,
+      "shifted_sd": 0.07379219529149068,
+      "n90": 3.405,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.45796875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.57125,
+      "shifted@0.02": 0.50859375,
+      "shifted_sd": 0.07535317236810606,
+      "n90": 3.405,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.4384375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.47484375,
+      "shifted@0.02": 0.4175,
+      "shifted_sd": 0.04831537022521922,
+      "n90": 3.0,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.31203125
+     },
+     "local bump": {
+      "shifted@0.01": 0.93015625,
+      "shifted@0.02": 0.84109375,
+      "shifted_sd": 0.05566339089507124,
+      "n90": 6.0275,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.696875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.59625,
+      "shifted@0.02": 0.53890625,
+      "shifted_sd": 0.1055120281576347,
+      "n90": 3.02,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.453125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.64109375,
+      "shifted@0.02": 0.57828125,
+      "shifted_sd": 0.1127383542696872,
+      "n90": 3.2925,
+      "nonzero": 0.56421875,
+      "shifted@0.05": 0.4828125
+     }
+    },
+    "shifted@0.01": 0.5652256944444444,
+    "shifted@0.02": 0.5008159722222222,
+    "shifted@0.05": 0.4213368055555555,
+    "n90": 2.9055555555555554,
+    "nonzero": 0.56421875
+   },
+   "Haar": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 1.0,
+      "shifted_sd": 0.0,
+      "n90": 4.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.7659375
+     },
+     "slope down": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 1.0,
+      "shifted_sd": 0.0,
+      "n90": 4.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.765
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.96015625,
+      "shifted@0.02": 0.91828125,
+      "shifted_sd": 0.062122099718518044,
+      "n90": 4.16,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.7984375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.953125,
+      "shifted@0.02": 0.90171875,
+      "shifted_sd": 0.0686005121951542,
+      "n90": 4.16,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.7590625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.8471875,
+      "shifted@0.02": 0.79546875,
+      "shifted_sd": 0.04322198107950976,
+      "n90": 4.0,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.61
+     },
+     "local bump": {
+      "shifted@0.01": 0.51171875,
+      "shifted@0.02": 0.4825,
+      "shifted_sd": 0.06893724501312772,
+      "n90": 4.3175,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.43125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.95375,
+      "shifted@0.02": 0.9159375,
+      "shifted_sd": 0.10262140295157732,
+      "n90": 5.3425,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.82015625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.96390625,
+      "shifted@0.02": 0.923125,
+      "shifted_sd": 0.0834345739187299,
+      "n90": 5.44,
+      "nonzero": 0.97328125,
+      "shifted@0.05": 0.83828125
+     }
+    },
+    "shifted@0.01": 0.8127604166666667,
+    "shifted@0.02": 0.7846701388888888,
+    "shifted@0.05": 0.6570138888888889,
+    "n90": 4.157777777777778,
+    "nonzero": 0.97328125
+   },
+   "db2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.5
+     },
+     "slope down": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.5
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.9265625,
+      "shifted@0.02": 0.86671875,
+      "shifted_sd": 0.09641916445104416,
+      "n90": 4.7775,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.7390625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.9146875,
+      "shifted@0.02": 0.8421875,
+      "shifted_sd": 0.10047494634857985,
+      "n90": 4.7775,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.70546875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.77640625,
+      "shifted@0.02": 0.635,
+      "shifted_sd": 0.08038967595406764,
+      "n90": 3.0,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.4446875
+     },
+     "local bump": {
+      "shifted@0.01": 0.68171875,
+      "shifted@0.02": 0.6334375,
+      "shifted_sd": 0.05217065596434456,
+      "n90": 4.115,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.56234375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.92140625,
+      "shifted@0.02": 0.86890625,
+      "shifted_sd": 0.1312945422930348,
+      "n90": 4.6825,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.76
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.92796875,
+      "shifted@0.02": 0.8746875,
+      "shifted_sd": 0.12538962713777405,
+      "n90": 4.2125,
+      "nonzero": 0.94359375,
+      "shifted@0.05": 0.760625
+     }
+    },
+    "shifted@0.01": 0.6970833333333333,
+    "shifted@0.02": 0.6495486111111111,
+    "shifted@0.05": 0.5663541666666667,
+    "n90": 4.1738888888888885,
+    "nonzero": 0.94359375
+   },
+   "db4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.7134375,
+      "shifted@0.02": 0.66484375,
+      "shifted_sd": 0.04312471693747682,
+      "n90": 5.0,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.59953125
+     },
+     "slope down": {
+      "shifted@0.01": 0.71390625,
+      "shifted@0.02": 0.66671875,
+      "shifted_sd": 0.043163196399681754,
+      "n90": 5.0,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.60171875
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.8246875,
+      "shifted@0.02": 0.74296875,
+      "shifted_sd": 0.11923984086050056,
+      "n90": 3.91,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.63671875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.80890625,
+      "shifted@0.02": 0.72734375,
+      "shifted_sd": 0.11827361269927245,
+      "n90": 3.91,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.608125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.6846875,
+      "shifted@0.02": 0.60625,
+      "shifted_sd": 0.05625,
+      "n90": 2.0,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.38453125
+     },
+     "local bump": {
+      "shifted@0.01": 0.7740625,
+      "shifted@0.02": 0.705625,
+      "shifted_sd": 0.06661163092884004,
+      "n90": 4.3875,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.6040625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.85921875,
+      "shifted@0.02": 0.7934375,
+      "shifted_sd": 0.15795290783569005,
+      "n90": 3.9375,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.6665625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.87359375,
+      "shifted@0.02": 0.8028125,
+      "shifted_sd": 0.1649570848546676,
+      "n90": 3.7625,
+      "nonzero": 0.8675,
+      "shifted@0.05": 0.66203125
+     }
+    },
+    "shifted@0.01": 0.7086111111111111,
+    "shifted@0.02": 0.6483333333333332,
+    "shifted@0.05": 0.5431423611111111,
+    "n90": 3.7675,
+    "nonzero": 0.8675
+   },
+   "db6": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.77171875,
+      "shifted@0.02": 0.7646875,
+      "shifted_sd": 0.027226982824947753,
+      "n90": 6.0,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.71484375
+     },
+     "slope down": {
+      "shifted@0.01": 0.771875,
+      "shifted@0.02": 0.76390625,
+      "shifted_sd": 0.02673610547438613,
+      "n90": 6.0,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.71765625
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.83015625,
+      "shifted@0.02": 0.77734375,
+      "shifted_sd": 0.08730097342491377,
+      "n90": 4.265,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.67890625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.8178125,
+      "shifted@0.02": 0.7575,
+      "shifted_sd": 0.09551668702378659,
+      "n90": 4.265,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.63609375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.71609375,
+      "shifted@0.02": 0.60484375,
+      "shifted_sd": 0.07311414850039287,
+      "n90": 4.0,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.4471875
+     },
+     "local bump": {
+      "shifted@0.01": 0.80375,
+      "shifted@0.02": 0.7353125,
+      "shifted_sd": 0.09792325997305237,
+      "n90": 4.4625,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.61296875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.84171875,
+      "shifted@0.02": 0.78,
+      "shifted_sd": 0.14502963059319982,
+      "n90": 4.01,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.6553125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.82609375,
+      "shifted@0.02": 0.75421875,
+      "shifted_sd": 0.1724472717193215,
+      "n90": 3.8525,
+      "nonzero": 0.84828125,
+      "shifted@0.05": 0.60890625
+     }
+    },
+    "shifted@0.01": 0.7226909722222222,
+    "shifted@0.02": 0.6736458333333333,
+    "shifted@0.05": 0.5774305555555556,
+    "n90": 4.317222222222222,
+    "nonzero": 0.84828125
+   },
+   "sym4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.75,
+      "shifted@0.02": 0.7478125,
+      "shifted_sd": 0.011486234968430693,
+      "n90": 4.0,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.655
+     },
+     "slope down": {
+      "shifted@0.01": 0.75,
+      "shifted@0.02": 0.74796875,
+      "shifted_sd": 0.011082741016440837,
+      "n90": 4.0,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.65140625
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.86078125,
+      "shifted@0.02": 0.796875,
+      "shifted_sd": 0.10766520735595134,
+      "n90": 4.77,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.67234375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.85015625,
+      "shifted@0.02": 0.78140625,
+      "shifted_sd": 0.10241219085605727,
+      "n90": 4.77,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.63578125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.584375,
+      "shifted@0.02": 0.41609375,
+      "shifted_sd": 0.08385706193241867,
+      "n90": 3.0,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.27515625
+     },
+     "local bump": {
+      "shifted@0.01": 0.78484375,
+      "shifted@0.02": 0.71234375,
+      "shifted_sd": 0.07420131374131794,
+      "n90": 4.2225,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.59171875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.8725,
+      "shifted@0.02": 0.7971875,
+      "shifted_sd": 0.1592827551675008,
+      "n90": 4.21,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.67125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.86328125,
+      "shifted@0.02": 0.79640625,
+      "shifted_sd": 0.1729928844951072,
+      "n90": 3.97,
+      "nonzero": 0.8821875,
+      "shifted@0.05": 0.6603125
+     }
+    },
+    "shifted@0.01": 0.7156597222222223,
+    "shifted@0.02": 0.6578993055555556,
+    "shifted@0.05": 0.5486631944444444,
+    "n90": 3.8825000000000003,
+    "nonzero": 0.8821875
+   },
+   "sym6": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.83671875,
+      "shifted@0.02": 0.7640625,
+      "shifted_sd": 0.04798172666495027,
+      "n90": 4.0,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.61984375
+     },
+     "slope down": {
+      "shifted@0.01": 0.83625,
+      "shifted@0.02": 0.7621875,
+      "shifted_sd": 0.048692875184671525,
+      "n90": 4.0,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.6128125
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.84265625,
+      "shifted@0.02": 0.76484375,
+      "shifted_sd": 0.10636195847640972,
+      "n90": 4.6525,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.65859375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.8184375,
+      "shifted@0.02": 0.7540625,
+      "shifted_sd": 0.1048766947121714,
+      "n90": 4.6525,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.6278125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.54265625,
+      "shifted@0.02": 0.43375,
+      "shifted_sd": 0.06850524614947384,
+      "n90": 2.0,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.31765625
+     },
+     "local bump": {
+      "shifted@0.01": 0.811875,
+      "shifted@0.02": 0.7459375,
+      "shifted_sd": 0.08017985154482392,
+      "n90": 4.24,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.6078125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.835,
+      "shifted@0.02": 0.756875,
+      "shifted_sd": 0.1487303033177839,
+      "n90": 4.14,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.63390625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.8234375,
+      "shifted@0.02": 0.74734375,
+      "shifted_sd": 0.17854329996092685,
+      "n90": 3.8275,
+      "nonzero": 0.8725,
+      "shifted@0.05": 0.6234375
+     }
+    },
+    "shifted@0.01": 0.7191145833333333,
+    "shifted@0.02": 0.6504513888888889,
+    "shifted@0.05": 0.5363194444444443,
+    "n90": 3.7236111111111105,
+    "nonzero": 0.8725
+   },
+   "coif1": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.54234375,
+      "shifted@0.02": 0.5190625,
+      "shifted_sd": 0.030744346533143296,
+      "n90": 5.0,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.48703125
+     },
+     "slope down": {
+      "shifted@0.01": 0.5390625,
+      "shifted@0.02": 0.5178125,
+      "shifted_sd": 0.03085848495551912,
+      "n90": 5.0,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.48640625
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.923125,
+      "shifted@0.02": 0.85671875,
+      "shifted_sd": 0.09676291398794014,
+      "n90": 4.8125,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.7215625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.90546875,
+      "shifted@0.02": 0.83703125,
+      "shifted_sd": 0.10035958299254485,
+      "n90": 4.8125,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.676875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.7825,
+      "shifted@0.02": 0.635,
+      "shifted_sd": 0.08254733490549529,
+      "n90": 3.0,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.44609375
+     },
+     "local bump": {
+      "shifted@0.01": 0.68359375,
+      "shifted@0.02": 0.64078125,
+      "shifted_sd": 0.05072689398571039,
+      "n90": 4.59,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.571875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.9165625,
+      "shifted@0.02": 0.86421875,
+      "shifted_sd": 0.1411828345566043,
+      "n90": 4.485,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.75328125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.92578125,
+      "shifted@0.02": 0.87203125,
+      "shifted_sd": 0.12159814307150213,
+      "n90": 4.37,
+      "nonzero": 0.93828125,
+      "shifted@0.05": 0.75890625
+     }
+    },
+    "shifted@0.01": 0.7048263888888889,
+    "shifted@0.02": 0.6519618055555556,
+    "shifted@0.05": 0.5585590277777777,
+    "n90": 4.23,
+    "nonzero": 0.9382812499999998
+   },
+   "coif2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.71375,
+      "shifted@0.02": 0.6353125,
+      "shifted_sd": 0.054764231883137005,
+      "n90": 5.0,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.58578125
+     },
+     "slope down": {
+      "shifted@0.01": 0.7071875,
+      "shifted@0.02": 0.63984375,
+      "shifted_sd": 0.05576505367107164,
+      "n90": 5.0,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.57953125
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.8425,
+      "shifted@0.02": 0.75703125,
+      "shifted_sd": 0.12762622045817035,
+      "n90": 4.2275,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.62984375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.81921875,
+      "shifted@0.02": 0.73890625,
+      "shifted_sd": 0.12563889459851793,
+      "n90": 4.2275,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.60375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.6309375,
+      "shifted@0.02": 0.56140625,
+      "shifted_sd": 0.053113739615446964,
+      "n90": 4.0,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.44328125
+     },
+     "local bump": {
+      "shifted@0.01": 0.78875,
+      "shifted@0.02": 0.7234375,
+      "shifted_sd": 0.06325713274999113,
+      "n90": 4.3975,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.59578125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.85296875,
+      "shifted@0.02": 0.78390625,
+      "shifted_sd": 0.15603978045978373,
+      "n90": 4.0725,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.6546875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.859375,
+      "shifted@0.02": 0.795,
+      "shifted_sd": 0.17140959716421947,
+      "n90": 3.95,
+      "nonzero": 0.87546875,
+      "shifted@0.05": 0.65640625
+     }
+    },
+    "shifted@0.01": 0.7044097222222222,
+    "shifted@0.02": 0.6399826388888888,
+    "shifted@0.05": 0.5415625000000001,
+    "n90": 4.097222222222222,
+    "nonzero": 0.87546875
+   },
+   "bior2.2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.4375,
+      "shifted@0.02": 0.4375,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.41734375
+     },
+     "slope down": {
+      "shifted@0.01": 0.4375,
+      "shifted@0.02": 0.4375,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.42203125
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.87921875,
+      "shifted@0.02": 0.79609375,
+      "shifted_sd": 0.1167361098201302,
+      "n90": 4.4575,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.64171875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.8584375,
+      "shifted@0.02": 0.75703125,
+      "shifted_sd": 0.12167200642891322,
+      "n90": 4.4575,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.61375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.73734375,
+      "shifted@0.02": 0.63765625,
+      "shifted_sd": 0.06935793005084205,
+      "n90": 2.0,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.41375
+     },
+     "local bump": {
+      "shifted@0.01": 0.63140625,
+      "shifted@0.02": 0.58328125,
+      "shifted_sd": 0.0496843061080408,
+      "n90": 4.0475,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.51765625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.88484375,
+      "shifted@0.02": 0.8215625,
+      "shifted_sd": 0.16055293860203868,
+      "n90": 3.9075,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.693125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.90890625,
+      "shifted@0.02": 0.85,
+      "shifted_sd": 0.13693063937629152,
+      "n90": 3.69,
+      "nonzero": 0.90640625,
+      "shifted@0.05": 0.7146875
+     }
+    },
+    "shifted@0.01": 0.6555729166666667,
+    "shifted@0.02": 0.6050694444444444,
+    "shifted@0.05": 0.5065624999999999,
+    "n90": 3.8399999999999994,
+    "nonzero": 0.9064062500000001
+   },
+   "bior4.4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.6815625,
+      "shifted@0.02": 0.6303125,
+      "shifted_sd": 0.04111602295638526,
+      "n90": 4.0,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.5528125
+     },
+     "slope down": {
+      "shifted@0.01": 0.6821875,
+      "shifted@0.02": 0.6396875,
+      "shifted_sd": 0.041682158578341406,
+      "n90": 4.0,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.55328125
+     },
+     "offset": {
+      "shifted@0.01": 0.125,
+      "shifted@0.02": 0.125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.79828125,
+      "shifted@0.02": 0.72140625,
+      "shifted_sd": 0.11747994759080163,
+      "n90": 4.4175,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.5990625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.7821875,
+      "shifted@0.02": 0.691875,
+      "shifted_sd": 0.11524600047290143,
+      "n90": 4.4175,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.57265625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.571875,
+      "shifted@0.02": 0.48234375,
+      "shifted_sd": 0.07036994181422562,
+      "n90": 2.0,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.3296875
+     },
+     "local bump": {
+      "shifted@0.01": 0.76203125,
+      "shifted@0.02": 0.6834375,
+      "shifted_sd": 0.08729384195778074,
+      "n90": 4.1075,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.5534375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.81875,
+      "shifted@0.02": 0.75203125,
+      "shifted_sd": 0.1656714999583136,
+      "n90": 3.8775,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.6253125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.84609375,
+      "shifted@0.02": 0.76453125,
+      "shifted_sd": 0.17576222119226162,
+      "n90": 3.6525,
+      "nonzero": 0.82796875,
+      "shifted@0.05": 0.63328125
+     }
+    },
+    "shifted@0.01": 0.67421875,
+    "shifted@0.02": 0.6100694444444446,
+    "shifted@0.05": 0.5049479166666667,
+    "n90": 3.608055555555555,
+    "nonzero": 0.82796875
+   },
+   "dmey": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.94046875,
+      "shifted@0.02": 0.88953125,
+      "shifted_sd": 0.04412534304045126,
+      "n90": 4.0,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.77859375
+     },
+     "slope down": {
+      "shifted@0.01": 0.94171875,
+      "shifted@0.02": 0.8853125,
+      "shifted_sd": 0.0429741473882845,
+      "n90": 4.0,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.774375
+     },
+     "offset": {
+      "shifted@0.01": 0.15953125,
+      "shifted@0.02": 0.14296875,
+      "shifted_sd": 0.031859294537662,
+      "n90": 2.0,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.13078125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.90640625,
+      "shifted@0.02": 0.83,
+      "shifted_sd": 0.1041445809920036,
+      "n90": 4.585,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.69109375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.8846875,
+      "shifted@0.02": 0.80015625,
+      "shifted_sd": 0.10939274409638648,
+      "n90": 4.585,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.648125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.6103125,
+      "shifted@0.02": 0.45796875,
+      "shifted_sd": 0.08041017285417001,
+      "n90": 3.0,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.31921875
+     },
+     "local bump": {
+      "shifted@0.01": 0.9465625,
+      "shifted@0.02": 0.8859375,
+      "shifted_sd": 0.08681371489430688,
+      "n90": 4.265,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.6928125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.86546875,
+      "shifted@0.02": 0.76875,
+      "shifted_sd": 0.1539835624344365,
+      "n90": 3.975,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.63453125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.79359375,
+      "shifted@0.02": 0.7040625,
+      "shifted_sd": 0.1757770138378451,
+      "n90": 3.7625,
+      "nonzero": 0.9215625,
+      "shifted@0.05": 0.5665625
+     }
+    },
+    "shifted@0.01": 0.7831944444444445,
+    "shifted@0.02": 0.7071875000000001,
+    "shifted@0.05": 0.5817881944444445,
+    "n90": 3.7969444444444442,
+    "nonzero": 0.9215624999999998
+   }
+  },
+  "32": {
+   "raw samples": {
+    "family": "baseline",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.997421875,
+      "shifted@0.02": 0.966328125,
+      "shifted_sd": 0.021457938280141805,
+      "n90": 18.0,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.918828125
+     },
+     "slope down": {
+      "shifted@0.01": 0.995546875,
+      "shifted@0.02": 0.9671875,
+      "shifted_sd": 0.02204177496822795,
+      "n90": 18.0,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.919453125
+     },
+     "offset": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 1.0,
+      "shifted_sd": 0.0,
+      "n90": 29.0,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 1.0
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.970234375,
+      "shifted@0.02": 0.939140625,
+      "shifted_sd": 0.04346720825357174,
+      "n90": 13.0925,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.86375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.9628125,
+      "shifted@0.02": 0.928203125,
+      "shifted_sd": 0.044127763612995106,
+      "n90": 13.0925,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.842890625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.97515625,
+      "shifted@0.02": 0.942421875,
+      "shifted_sd": 0.02600882043143008,
+      "n90": 18.0,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.86015625
+     },
+     "local bump": {
+      "shifted@0.01": 0.365859375,
+      "shifted@0.02": 0.336171875,
+      "shifted_sd": 0.025554280272282667,
+      "n90": 5.0,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.29375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.979921875,
+      "shifted@0.02": 0.9659375,
+      "shifted_sd": 0.06612089424871688,
+      "n90": 17.6125,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.926875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.964609375,
+      "shifted@0.02": 0.9378125,
+      "shifted_sd": 0.07558302037329548,
+      "n90": 14.35,
+      "nonzero": 0.991796875,
+      "shifted@0.05": 0.8721875
+     }
+    },
+    "shifted@0.01": 0.9123958333333333,
+    "shifted@0.02": 0.8870225694444444,
+    "shifted@0.05": 0.8330989583333334,
+    "n90": 16.238611111111112,
+    "nonzero": 0.9917968749999999
+   },
+   "DCT-II": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.23140625,
+      "shifted@0.02": 0.17640625,
+      "shifted_sd": 0.029957244924016295,
+      "n90": 1.0,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.116640625
+     },
+     "slope down": {
+      "shifted@0.01": 0.23453125,
+      "shifted@0.02": 0.1775,
+      "shifted_sd": 0.029441414283284693,
+      "n90": 1.0,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.114140625
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.54671875,
+      "shifted@0.02": 0.437265625,
+      "shifted_sd": 0.1383582721582247,
+      "n90": 3.1825,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.31125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.51359375,
+      "shifted@0.02": 0.4046875,
+      "shifted_sd": 0.13146373965375396,
+      "n90": 3.1825,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.284609375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.2821875,
+      "shifted@0.02": 0.21546875,
+      "shifted_sd": 0.03169950154872313,
+      "n90": 1.0,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.139375
+     },
+     "local bump": {
+      "shifted@0.01": 0.487109375,
+      "shifted@0.02": 0.44140625,
+      "shifted_sd": 0.03582693589936907,
+      "n90": 5.7325,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.37234375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.507265625,
+      "shifted@0.02": 0.412109375,
+      "shifted_sd": 0.13832262357748779,
+      "n90": 3.0775,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.306796875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.533515625,
+      "shifted@0.02": 0.427421875,
+      "shifted_sd": 0.11775277726123648,
+      "n90": 3.5125,
+      "nonzero": 0.491171875,
+      "shifted@0.05": 0.311015625
+     }
+    },
+    "shifted@0.01": 0.37417534722222223,
+    "shifted@0.02": 0.3026128472222222,
+    "shifted@0.05": 0.22082465277777777,
+    "n90": 2.5208333333333335,
+    "nonzero": 0.4911718749999999
+   },
+   "DST-II": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.5
+     },
+     "slope down": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.5
+     },
+     "offset": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.5
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.965859375,
+      "shifted@0.02": 0.93515625,
+      "shifted_sd": 0.1681830028895236,
+      "n90": 7.75,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.862421875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.960625,
+      "shifted@0.02": 0.9240625,
+      "shifted_sd": 0.18244514372476456,
+      "n90": 7.75,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.843359375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 8.0,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.5
+     },
+     "local bump": {
+      "shifted@0.01": 0.456328125,
+      "shifted@0.02": 0.4125,
+      "shifted_sd": 0.03590351654086268,
+      "n90": 5.1025,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.347265625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.9009375,
+      "shifted@0.02": 0.827734375,
+      "shifted_sd": 0.18874545666613904,
+      "n90": 3.735,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.655625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.429453125,
+      "shifted@0.02": 0.3434375,
+      "shifted_sd": 0.10791390158941526,
+      "n90": 2.8225,
+      "nonzero": 0.9028125,
+      "shifted@0.05": 0.265546875
+     }
+    },
+    "shifted@0.01": 0.6348003472222222,
+    "shifted@0.02": 0.6047656250000001,
+    "shifted@0.05": 0.5526909722222223,
+    "n90": 5.239999999999999,
+    "nonzero": 0.9028125
+   },
+   "real DFT": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.96015625,
+      "shifted@0.02": 0.93921875,
+      "shifted_sd": 0.01993581007728304,
+      "n90": 9.0,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.88734375
+     },
+     "slope down": {
+      "shifted@0.01": 0.960625,
+      "shifted@0.02": 0.939921875,
+      "shifted_sd": 0.019677421775587754,
+      "n90": 9.0,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.887109375
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.93625,
+      "shifted@0.02": 0.8853125,
+      "shifted_sd": 0.16576085230309962,
+      "n90": 4.4975,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.7578125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.922734375,
+      "shifted@0.02": 0.860859375,
+      "shifted_sd": 0.16766940986912127,
+      "n90": 4.4975,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.72640625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.503359375,
+      "shifted@0.02": 0.377109375,
+      "shifted_sd": 0.07390439182389213,
+      "n90": 1.0,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.221796875
+     },
+     "local bump": {
+      "shifted@0.01": 0.4696875,
+      "shifted@0.02": 0.43125,
+      "shifted_sd": 0.0465089877066788,
+      "n90": 5.3225,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.3546875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.84578125,
+      "shifted@0.02": 0.751484375,
+      "shifted_sd": 0.23123995702432001,
+      "n90": 3.4225,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.57546875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.500546875,
+      "shifted@0.02": 0.41546875,
+      "shifted_sd": 0.12142535242253777,
+      "n90": 3.12,
+      "nonzero": 0.9578125,
+      "shifted@0.05": 0.305
+     }
+    },
+    "shifted@0.01": 0.6811545138888889,
+    "shifted@0.02": 0.6257638888888889,
+    "shifted@0.05": 0.5274305555555555,
+    "n90": 4.539999999999999,
+    "nonzero": 0.9578124999999998
+   },
+   "Walsh\u2013Hadamard": {
+    "family": "other",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.15625,
+      "shifted@0.02": 0.15625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.15625
+     },
+     "slope down": {
+      "shifted@0.01": 0.15625,
+      "shifted@0.02": 0.15625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.15625
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.853203125,
+      "shifted@0.02": 0.766328125,
+      "shifted_sd": 0.10324090905612163,
+      "n90": 5.06,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.613203125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.833359375,
+      "shifted@0.02": 0.73375,
+      "shifted_sd": 0.10779936514191538,
+      "n90": 5.06,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.5778125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.304140625,
+      "shifted@0.02": 0.280625,
+      "shifted_sd": 0.02071948056781347,
+      "n90": 3.0,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.23109375
+     },
+     "local bump": {
+      "shifted@0.01": 0.82921875,
+      "shifted@0.02": 0.758984375,
+      "shifted_sd": 0.09672288334261638,
+      "n90": 8.065,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.62015625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.84171875,
+      "shifted@0.02": 0.756640625,
+      "shifted_sd": 0.15881440545762646,
+      "n90": 4.71,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.612109375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.842265625,
+      "shifted@0.02": 0.765703125,
+      "shifted_sd": 0.12407861100521868,
+      "n90": 5.155,
+      "nonzero": 0.8490625,
+      "shifted@0.05": 0.624375
+     }
+    },
+    "shifted@0.01": 0.5386284722222222,
+    "shifted@0.02": 0.48953125000000003,
+    "shifted@0.05": 0.4025,
+    "n90": 4.0055555555555555,
+    "nonzero": 0.8490625
+   },
+   "orthogonal polynomials": {
+    "family": "polynomial",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.03125
+     },
+     "slope down": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.03125
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.3303125,
+      "shifted@0.02": 0.30046875,
+      "shifted_sd": 0.07205666579808907,
+      "n90": 3.485,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.257109375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.319296875,
+      "shifted@0.02": 0.288046875,
+      "shifted_sd": 0.07235028824396192,
+      "n90": 3.485,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.249609375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.0325,
+      "shifted@0.02": 0.0325,
+      "shifted_sd": 0.006123724356957946,
+      "n90": 1.0,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.031484375
+     },
+     "local bump": {
+      "shifted@0.01": 0.619765625,
+      "shifted@0.02": 0.561640625,
+      "shifted_sd": 0.0481771607544423,
+      "n90": 7.3725,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.4640625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.364921875,
+      "shifted@0.02": 0.331484375,
+      "shifted_sd": 0.09960098003839808,
+      "n90": 3.775,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.281875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.388203125,
+      "shifted@0.02": 0.354375,
+      "shifted_sd": 0.0911589871460845,
+      "n90": 4.3175,
+      "nonzero": 0.3303125,
+      "shifted@0.05": 0.308125
+     }
+    },
+    "shifted@0.01": 0.23874999999999996,
+    "shifted@0.02": 0.21802951388888892,
+    "shifted@0.05": 0.18733506944444442,
+    "n90": 2.937222222222222,
+    "nonzero": 0.3303125
+   },
+   "PCA (learned)": {
+    "family": "data-driven",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.231015625,
+      "shifted@0.02": 0.198828125,
+      "shifted_sd": 0.02690212566386483,
+      "n90": 1.0,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.15515625
+     },
+     "slope down": {
+      "shifted@0.01": 0.23515625,
+      "shifted@0.02": 0.19953125,
+      "shifted_sd": 0.02673245262667644,
+      "n90": 1.0,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.15625
+     },
+     "offset": {
+      "shifted@0.01": 0.2246875,
+      "shifted@0.02": 0.206796875,
+      "shifted_sd": 0.020520420231671062,
+      "n90": 2.0,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.19328125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.318984375,
+      "shifted@0.02": 0.286484375,
+      "shifted_sd": 0.04267019861225601,
+      "n90": 3.4175,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.2440625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.311328125,
+      "shifted@0.02": 0.27640625,
+      "shifted_sd": 0.03783670454647841,
+      "n90": 3.4175,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.23703125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.2603125,
+      "shifted@0.02": 0.22859375,
+      "shifted_sd": 0.02432235902287235,
+      "n90": 3.0,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.1725
+     },
+     "local bump": {
+      "shifted@0.01": 0.507421875,
+      "shifted@0.02": 0.458125,
+      "shifted_sd": 0.028716012519150354,
+      "n90": 6.1025,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.384609375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.32515625,
+      "shifted@0.02": 0.289921875,
+      "shifted_sd": 0.05867593195028414,
+      "n90": 3.0325,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.245546875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.35859375,
+      "shifted@0.02": 0.3140625,
+      "shifted_sd": 0.0633728118458539,
+      "n90": 3.295,
+      "nonzero": 0.30296875,
+      "shifted@0.05": 0.265
+     }
+    },
+    "shifted@0.01": 0.30807291666666664,
+    "shifted@0.02": 0.2731944444444444,
+    "shifted@0.05": 0.2281597222222222,
+    "n90": 2.9183333333333334,
+    "nonzero": 0.30296875
+   },
+   "Haar": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 0.83265625,
+      "shifted_sd": 0.05811974942682994,
+      "n90": 4.0,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.559765625
+     },
+     "slope down": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 0.832734375,
+      "shifted_sd": 0.05601725939038231,
+      "n90": 4.0,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.573359375
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.9271875,
+      "shifted@0.02": 0.8446875,
+      "shifted_sd": 0.06654195692380861,
+      "n90": 4.52,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.66015625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.9115625,
+      "shifted@0.02": 0.81671875,
+      "shifted_sd": 0.07389666956932159,
+      "n90": 4.52,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.6140625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.84234375,
+      "shifted@0.02": 0.718515625,
+      "shifted_sd": 0.05055786202075178,
+      "n90": 4.0,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.48453125
+     },
+     "local bump": {
+      "shifted@0.01": 0.453359375,
+      "shifted@0.02": 0.42,
+      "shifted_sd": 0.04280679706541942,
+      "n90": 4.7675,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.361640625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.917578125,
+      "shifted@0.02": 0.85328125,
+      "shifted_sd": 0.14002292990234672,
+      "n90": 5.85,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.71296875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.93140625,
+      "shifted@0.02": 0.86828125,
+      "shifted_sd": 0.1114919025577082,
+      "n90": 6.015,
+      "nonzero": 0.945859375,
+      "shifted@0.05": 0.738828125
+     }
+    },
+    "shifted@0.01": 0.7828819444444446,
+    "shifted@0.02": 0.694375,
+    "shifted@0.05": 0.5297569444444444,
+    "n90": 4.408055555555555,
+    "nonzero": 0.945859375
+   },
+   "db2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.3125,
+      "shifted@0.02": 0.3125,
+      "shifted_sd": 0.0,
+      "n90": 8.0,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.3125
+     },
+     "slope down": {
+      "shifted@0.01": 0.3125,
+      "shifted@0.02": 0.3125,
+      "shifted_sd": 0.0,
+      "n90": 8.0,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.3125
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.753359375,
+      "shifted@0.02": 0.64703125,
+      "shifted_sd": 0.12446359517319713,
+      "n90": 5.4025,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.509296875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.720078125,
+      "shifted@0.02": 0.617109375,
+      "shifted_sd": 0.12007380441153422,
+      "n90": 5.4025,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.481484375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.5659375,
+      "shifted@0.02": 0.43625,
+      "shifted_sd": 0.05527276114868878,
+      "n90": 3.0,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.305546875
+     },
+     "local bump": {
+      "shifted@0.01": 0.53734375,
+      "shifted@0.02": 0.486875,
+      "shifted_sd": 0.043957099113795035,
+      "n90": 4.1825,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.383828125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.79265625,
+      "shifted@0.02": 0.6940625,
+      "shifted_sd": 0.18502507220306658,
+      "n90": 4.955,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.549921875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.815703125,
+      "shifted@0.02": 0.71890625,
+      "shifted_sd": 0.18197584993876936,
+      "n90": 4.285,
+      "nonzero": 0.79296875,
+      "shifted@0.05": 0.549765625
+     }
+    },
+    "shifted@0.01": 0.5413975694444444,
+    "shifted@0.02": 0.4764149305555556,
+    "shifted@0.05": 0.3852604166666667,
+    "n90": 5.025277777777777,
+    "nonzero": 0.79296875
+   },
+   "db4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.492890625,
+      "shifted@0.02": 0.459375,
+      "shifted_sd": 0.025387620014487376,
+      "n90": 5.0,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.405234375
+     },
+     "slope down": {
+      "shifted@0.01": 0.492578125,
+      "shifted@0.02": 0.46,
+      "shifted_sd": 0.023832094956172025,
+      "n90": 5.0,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.409375
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.56640625,
+      "shifted@0.02": 0.49953125,
+      "shifted_sd": 0.07702205827512987,
+      "n90": 3.8175,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.42375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.541640625,
+      "shifted@0.02": 0.480078125,
+      "shifted_sd": 0.07549377658280433,
+      "n90": 3.8175,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.39421875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.414296875,
+      "shifted@0.02": 0.3240625,
+      "shifted_sd": 0.04271201711755136,
+      "n90": 4.0,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.249375
+     },
+     "local bump": {
+      "shifted@0.01": 0.534609375,
+      "shifted@0.02": 0.465234375,
+      "shifted_sd": 0.041514819337308634,
+      "n90": 4.24,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.331953125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.58578125,
+      "shifted@0.02": 0.508515625,
+      "shifted_sd": 0.12650748707926096,
+      "n90": 4.1175,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.407890625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.59390625,
+      "shifted@0.02": 0.495078125,
+      "shifted_sd": 0.1493236501369906,
+      "n90": 4.0225,
+      "nonzero": 0.57765625,
+      "shifted@0.05": 0.38234375
+     }
+    },
+    "shifted@0.01": 0.4760677083333334,
+    "shifted@0.02": 0.41715277777777776,
+    "shifted@0.05": 0.3407378472222222,
+    "n90": 4.001666666666667,
+    "nonzero": 0.57765625
+   },
+   "db6": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.523359375,
+      "shifted@0.02": 0.513828125,
+      "shifted_sd": 0.01866370113976258,
+      "n90": 5.0,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.47578125
+     },
+     "slope down": {
+      "shifted@0.01": 0.5225,
+      "shifted@0.02": 0.5140625,
+      "shifted_sd": 0.020191949973937633,
+      "n90": 5.0,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.47109375
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.55390625,
+      "shifted@0.02": 0.51875,
+      "shifted_sd": 0.061555361261225655,
+      "n90": 4.805,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.44546875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.544375,
+      "shifted@0.02": 0.508828125,
+      "shifted_sd": 0.06333576933877391,
+      "n90": 4.805,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.425703125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.439609375,
+      "shifted@0.02": 0.378671875,
+      "shifted_sd": 0.036492905854896986,
+      "n90": 2.0,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.257265625
+     },
+     "local bump": {
+      "shifted@0.01": 0.526875,
+      "shifted@0.02": 0.45,
+      "shifted_sd": 0.044469529596117836,
+      "n90": 4.715,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.34484375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.54765625,
+      "shifted@0.02": 0.49890625,
+      "shifted_sd": 0.09056450027984199,
+      "n90": 4.1,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.412734375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.491953125,
+      "shifted@0.02": 0.4271875,
+      "shifted_sd": 0.1012668774513661,
+      "n90": 3.7575,
+      "nonzero": 0.5584375,
+      "shifted@0.05": 0.348203125
+     }
+    },
+    "shifted@0.01": 0.46808159722222226,
+    "shifted@0.02": 0.4303038194444444,
+    "shifted@0.05": 0.36039930555555555,
+    "n90": 4.020277777777777,
+    "nonzero": 0.5584375
+   },
+   "sym4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.51,
+      "shifted@0.02": 0.503359375,
+      "shifted_sd": 0.011732023732475783,
+      "n90": 6.0,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.4490625
+     },
+     "slope down": {
+      "shifted@0.01": 0.50953125,
+      "shifted@0.02": 0.5028125,
+      "shifted_sd": 0.012179484543690671,
+      "n90": 6.0,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.449765625
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.593203125,
+      "shifted@0.02": 0.535390625,
+      "shifted_sd": 0.07338724177852288,
+      "n90": 5.41,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.444765625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.573828125,
+      "shifted@0.02": 0.523203125,
+      "shifted_sd": 0.07565594505050063,
+      "n90": 5.41,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.4059375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.31734375,
+      "shifted@0.02": 0.25375,
+      "shifted_sd": 0.03828093112112087,
+      "n90": 3.0,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.166640625
+     },
+     "local bump": {
+      "shifted@0.01": 0.54125,
+      "shifted@0.02": 0.474921875,
+      "shifted_sd": 0.04012302553066475,
+      "n90": 4.205,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.335078125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.606171875,
+      "shifted@0.02": 0.5225,
+      "shifted_sd": 0.13157177817640073,
+      "n90": 4.4625,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.418046875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.57890625,
+      "shifted@0.02": 0.4853125,
+      "shifted_sd": 0.15064671783264977,
+      "n90": 3.9725,
+      "nonzero": 0.59125,
+      "shifted@0.05": 0.37875
+     }
+    },
+    "shifted@0.01": 0.47697048611111115,
+    "shifted@0.02": 0.42930555555555555,
+    "shifted@0.05": 0.3456163194444445,
+    "n90": 4.495555555555555,
+    "nonzero": 0.59125
+   },
+   "sym6": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.59796875,
+      "shifted@0.02": 0.534453125,
+      "shifted_sd": 0.03197584766639307,
+      "n90": 6.0,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.474921875
+     },
+     "slope down": {
+      "shifted@0.01": 0.5975,
+      "shifted@0.02": 0.531875,
+      "shifted_sd": 0.033213325638966056,
+      "n90": 6.0,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.4734375
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.581328125,
+      "shifted@0.02": 0.512421875,
+      "shifted_sd": 0.06636115196584802,
+      "n90": 5.205,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.444375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.561328125,
+      "shifted@0.02": 0.506640625,
+      "shifted_sd": 0.07107121036931463,
+      "n90": 5.205,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.417421875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.32359375,
+      "shifted@0.02": 0.2634375,
+      "shifted_sd": 0.039032488471144135,
+      "n90": 2.0,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.18546875
+     },
+     "local bump": {
+      "shifted@0.01": 0.52296875,
+      "shifted@0.02": 0.44796875,
+      "shifted_sd": 0.04361334684976034,
+      "n90": 4.21,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.339140625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.548203125,
+      "shifted@0.02": 0.49390625,
+      "shifted_sd": 0.09751289478031866,
+      "n90": 4.32,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.402265625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.4759375,
+      "shifted@0.02": 0.418125,
+      "shifted_sd": 0.10289083262127877,
+      "n90": 3.89,
+      "nonzero": 0.6059375,
+      "shifted@0.05": 0.345
+     }
+    },
+    "shifted@0.01": 0.4745920138888889,
+    "shifted@0.02": 0.41903645833333336,
+    "shifted@0.05": 0.3493923611111111,
+    "n90": 4.314444444444444,
+    "nonzero": 0.6059375
+   },
+   "coif1": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.37046875,
+      "shifted@0.02": 0.341953125,
+      "shifted_sd": 0.02546815087485495,
+      "n90": 6.0,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.311953125
+     },
+     "slope down": {
+      "shifted@0.01": 0.372421875,
+      "shifted@0.02": 0.341484375,
+      "shifted_sd": 0.027103745813252,
+      "n90": 6.0,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.312578125
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.745234375,
+      "shifted@0.02": 0.639296875,
+      "shifted_sd": 0.11976618558251062,
+      "n90": 5.36,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.49890625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.71921875,
+      "shifted@0.02": 0.60703125,
+      "shifted_sd": 0.12090711423831725,
+      "n90": 5.36,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.46625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.51640625,
+      "shifted@0.02": 0.401484375,
+      "shifted_sd": 0.05057524319871704,
+      "n90": 3.0,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.273203125
+     },
+     "local bump": {
+      "shifted@0.01": 0.53390625,
+      "shifted@0.02": 0.483671875,
+      "shifted_sd": 0.0375584667915821,
+      "n90": 4.61,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.377890625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.78640625,
+      "shifted@0.02": 0.68640625,
+      "shifted_sd": 0.18710577045066648,
+      "n90": 4.7975,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.53828125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.810546875,
+      "shifted@0.02": 0.71515625,
+      "shifted_sd": 0.1820477460336642,
+      "n90": 4.425,
+      "nonzero": 0.785390625,
+      "shifted@0.05": 0.54484375
+     }
+    },
+    "shifted@0.01": 0.5463454861111111,
+    "shifted@0.02": 0.47544270833333335,
+    "shifted@0.05": 0.37626736111111114,
+    "n90": 4.616944444444444,
+    "nonzero": 0.785390625
+   },
+   "coif2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.496015625,
+      "shifted@0.02": 0.452265625,
+      "shifted_sd": 0.03246458030853587,
+      "n90": 5.0,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.408125
+     },
+     "slope down": {
+      "shifted@0.01": 0.495,
+      "shifted@0.02": 0.450859375,
+      "shifted_sd": 0.03194147097989345,
+      "n90": 5.0,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.409140625
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.571953125,
+      "shifted@0.02": 0.497578125,
+      "shifted_sd": 0.07937434639248613,
+      "n90": 4.6425,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.4046875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.5475,
+      "shifted@0.02": 0.483359375,
+      "shifted_sd": 0.07969634601635997,
+      "n90": 4.6425,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.39
+     },
+     "added curvature": {
+      "shifted@0.01": 0.3775,
+      "shifted@0.02": 0.33328125,
+      "shifted_sd": 0.03259264140013049,
+      "n90": 3.0,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.26234375
+     },
+     "local bump": {
+      "shifted@0.01": 0.54109375,
+      "shifted@0.02": 0.47375,
+      "shifted_sd": 0.03569072883817309,
+      "n90": 4.4925,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.332890625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.58046875,
+      "shifted@0.02": 0.502265625,
+      "shifted_sd": 0.13084850701138845,
+      "n90": 4.0825,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.3934375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.5784375,
+      "shifted@0.02": 0.4865625,
+      "shifted_sd": 0.14272768269067498,
+      "n90": 3.94,
+      "nonzero": 0.58390625,
+      "shifted@0.05": 0.37640625
+     }
+    },
+    "shifted@0.01": 0.4722743055555556,
+    "shifted@0.02": 0.41582465277777775,
+    "shifted@0.05": 0.33772569444444445,
+    "n90": 4.088888888888889,
+    "nonzero": 0.58390625
+   },
+   "bior2.2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.28125,
+      "shifted@0.02": 0.28125,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.272109375
+     },
+     "slope down": {
+      "shifted@0.01": 0.28125,
+      "shifted@0.02": 0.28125,
+      "shifted_sd": 0.0,
+      "n90": 5.0,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.272734375
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.67015625,
+      "shifted@0.02": 0.553828125,
+      "shifted_sd": 0.12396246655836747,
+      "n90": 4.7475,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.42171875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.637265625,
+      "shifted@0.02": 0.529140625,
+      "shifted_sd": 0.11637402553129876,
+      "n90": 4.7475,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.396328125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.43546875,
+      "shifted@0.02": 0.33765625,
+      "shifted_sd": 0.047206897916909345,
+      "n90": 2.0,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.214375
+     },
+     "local bump": {
+      "shifted@0.01": 0.491875,
+      "shifted@0.02": 0.427578125,
+      "shifted_sd": 0.04034390431322153,
+      "n90": 3.8875,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.324375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.72765625,
+      "shifted@0.02": 0.625625,
+      "shifted_sd": 0.1978635893740938,
+      "n90": 4.035,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.46890625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.76546875,
+      "shifted@0.02": 0.653671875,
+      "shifted_sd": 0.19952505557632197,
+      "n90": 3.67,
+      "nonzero": 0.713984375,
+      "shifted@0.05": 0.477734375
+     }
+    },
+    "shifted@0.01": 0.48365451388888886,
+    "shifted@0.02": 0.41694444444444445,
+    "shifted@0.05": 0.3234201388888889,
+    "n90": 3.898611111111111,
+    "nonzero": 0.713984375
+   },
+   "bior4.4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.474296875,
+      "shifted@0.02": 0.445546875,
+      "shifted_sd": 0.02201281919664937,
+      "n90": 5.0,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.381640625
+     },
+     "slope down": {
+      "shifted@0.01": 0.473828125,
+      "shifted@0.02": 0.44703125,
+      "shifted_sd": 0.021582305216021298,
+      "n90": 5.0,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.385546875
+     },
+     "offset": {
+      "shifted@0.01": 0.0625,
+      "shifted@0.02": 0.0625,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.0625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.5346875,
+      "shifted@0.02": 0.47234375,
+      "shifted_sd": 0.07299919065261957,
+      "n90": 4.8925,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.3859375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.514921875,
+      "shifted@0.02": 0.453828125,
+      "shifted_sd": 0.07248042401389754,
+      "n90": 4.8925,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.367578125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.3259375,
+      "shifted@0.02": 0.250859375,
+      "shifted_sd": 0.04010172307219947,
+      "n90": 2.0,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.186875
+     },
+     "local bump": {
+      "shifted@0.01": 0.506953125,
+      "shifted@0.02": 0.42890625,
+      "shifted_sd": 0.049007483086131856,
+      "n90": 4.0125,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.297734375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.54671875,
+      "shifted@0.02": 0.4675,
+      "shifted_sd": 0.11199278018024197,
+      "n90": 4.09,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.375703125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.548203125,
+      "shifted@0.02": 0.458125,
+      "shifted_sd": 0.12909087157889979,
+      "n90": 3.665,
+      "nonzero": 0.532734375,
+      "shifted@0.05": 0.355078125
+     }
+    },
+    "shifted@0.01": 0.44311631944444446,
+    "shifted@0.02": 0.38740451388888886,
+    "shifted@0.05": 0.3109548611111111,
+    "n90": 3.950277777777777,
+    "nonzero": 0.532734375
+   },
+   "dmey": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.741328125,
+      "shifted@0.02": 0.67453125,
+      "shifted_sd": 0.02894254478164455,
+      "n90": 5.0,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.54203125
+     },
+     "slope down": {
+      "shifted@0.01": 0.7409375,
+      "shifted@0.02": 0.67609375,
+      "shifted_sd": 0.030567148802881503,
+      "n90": 5.0,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.53984375
+     },
+     "offset": {
+      "shifted@0.01": 0.099765625,
+      "shifted@0.02": 0.081484375,
+      "shifted_sd": 0.024073531359345163,
+      "n90": 2.0,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.06828125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.7065625,
+      "shifted@0.02": 0.613515625,
+      "shifted_sd": 0.10134565191516297,
+      "n90": 5.0225,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.477265625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.686640625,
+      "shifted@0.02": 0.59328125,
+      "shifted_sd": 0.10840991634042293,
+      "n90": 5.0225,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.44171875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.42296875,
+      "shifted@0.02": 0.3278125,
+      "shifted_sd": 0.042560847985560625,
+      "n90": 2.0,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.224765625
+     },
+     "local bump": {
+      "shifted@0.01": 0.52296875,
+      "shifted@0.02": 0.4703125,
+      "shifted_sd": 0.039805435008928115,
+      "n90": 4.2525,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.395
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.628515625,
+      "shifted@0.02": 0.53515625,
+      "shifted_sd": 0.13473561713013193,
+      "n90": 4.155,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.415703125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.48703125,
+      "shifted@0.02": 0.40984375,
+      "shifted_sd": 0.10440388354097513,
+      "n90": 3.76,
+      "nonzero": 0.70796875,
+      "shifted@0.05": 0.318671875
+     }
+    },
+    "shifted@0.01": 0.5596354166666666,
+    "shifted@0.02": 0.48689236111111117,
+    "shifted@0.05": 0.38036458333333334,
+    "n90": 4.023611111111111,
+    "nonzero": 0.70796875
+   }
+  },
+  "64": {
+   "raw samples": {
+    "family": "baseline",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.983359375,
+      "shifted@0.02": 0.967578125,
+      "shifted_sd": 0.012735812802266487,
+      "n90": 35.0,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.915546875
+     },
+     "slope down": {
+      "shifted@0.01": 0.98328125,
+      "shifted@0.02": 0.9675,
+      "shifted_sd": 0.013742895892060012,
+      "n90": 35.0,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.9181640625
+     },
+     "offset": {
+      "shifted@0.01": 1.0,
+      "shifted@0.02": 1.0,
+      "shifted_sd": 0.0,
+      "n90": 58.0,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 1.0
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.9658203125,
+      "shifted@0.02": 0.94140625,
+      "shifted_sd": 0.03641831881502083,
+      "n90": 25.645,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.8631640625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.963359375,
+      "shifted@0.02": 0.929609375,
+      "shifted_sd": 0.03895289309999163,
+      "n90": 25.645,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.8451171875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.969609375,
+      "shifted@0.02": 0.94046875,
+      "shifted_sd": 0.01581061624154796,
+      "n90": 36.0,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.8521875
+     },
+     "local bump": {
+      "shifted@0.01": 0.365703125,
+      "shifted@0.02": 0.336015625,
+      "shifted_sd": 0.017258199760820218,
+      "n90": 9.105,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.29484375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.9787890625,
+      "shifted@0.02": 0.96515625,
+      "shifted_sd": 0.0651435089461145,
+      "n90": 34.6975,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.92703125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.96109375,
+      "shifted@0.02": 0.9341796875,
+      "shifted_sd": 0.07285732215837913,
+      "n90": 28.19,
+      "nonzero": 0.9918359375,
+      "shifted@0.05": 0.8703515625
+     }
+    },
+    "shifted@0.01": 0.9078906250000001,
+    "shifted@0.02": 0.8868793402777778,
+    "shifted@0.05": 0.8318229166666666,
+    "n90": 31.920277777777773,
+    "nonzero": 0.9918359375
+   },
+   "DCT-II": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.151640625,
+      "shifted@0.02": 0.1083984375,
+      "shifted_sd": 0.01756401343290006,
+      "n90": 1.0,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.070546875
+     },
+     "slope down": {
+      "shifted@0.01": 0.150859375,
+      "shifted@0.02": 0.1094140625,
+      "shifted_sd": 0.01786651452602308,
+      "n90": 1.0,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.0709765625
+     },
+     "offset": {
+      "shifted@0.01": 0.015625,
+      "shifted@0.02": 0.015625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.015625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.36703125,
+      "shifted@0.02": 0.2759765625,
+      "shifted_sd": 0.10393690073066492,
+      "n90": 3.1825,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.1867578125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.336953125,
+      "shifted@0.02": 0.24984375,
+      "shifted_sd": 0.09157623083905288,
+      "n90": 3.1825,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.170234375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.189453125,
+      "shifted@0.02": 0.13609375,
+      "shifted_sd": 0.021372007283184703,
+      "n90": 1.0,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.085546875
+     },
+     "local bump": {
+      "shifted@0.01": 0.25328125,
+      "shifted@0.02": 0.2314453125,
+      "shifted_sd": 0.01847020239371631,
+      "n90": 5.7325,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.2017578125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3350390625,
+      "shifted@0.02": 0.25671875,
+      "shifted_sd": 0.10451840354544026,
+      "n90": 3.085,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.17875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.3533984375,
+      "shifted@0.02": 0.2669140625,
+      "shifted_sd": 0.08664579384660627,
+      "n90": 3.5175,
+      "nonzero": 0.3115625,
+      "shifted@0.05": 0.1818359375
+     }
+    },
+    "shifted@0.01": 0.23925347222222224,
+    "shifted@0.02": 0.1833810763888889,
+    "shifted@0.05": 0.12911458333333334,
+    "n90": 2.5222222222222226,
+    "nonzero": 0.3115625
+   },
+   "DST-II": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 6.0,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.495703125
+     },
+     "slope down": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 6.0,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.4955078125
+     },
+     "offset": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.5
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.9522265625,
+      "shifted@0.02": 0.9127734375,
+      "shifted_sd": 0.20624893095721997,
+      "n90": 8.4825,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.8080859375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.9420703125,
+      "shifted@0.02": 0.899609375,
+      "shifted_sd": 0.2223720088112134,
+      "n90": 8.4825,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.7698046875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.5,
+      "shifted@0.02": 0.5,
+      "shifted_sd": 0.0,
+      "n90": 10.0,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.4563671875
+     },
+     "local bump": {
+      "shifted@0.01": 0.2394140625,
+      "shifted@0.02": 0.217265625,
+      "shifted_sd": 0.01764985365334158,
+      "n90": 5.1025,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.1893359375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.86609375,
+      "shifted@0.02": 0.7687890625,
+      "shifted_sd": 0.2224582418625091,
+      "n90": 3.795,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.5784375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.2444140625,
+      "shifted@0.02": 0.194609375,
+      "shifted_sd": 0.06303089946295685,
+      "n90": 2.8225,
+      "nonzero": 0.881953125,
+      "shifted@0.05": 0.1459375
+     }
+    },
+    "shifted@0.01": 0.5826909722222221,
+    "shifted@0.02": 0.5547829861111111,
+    "shifted@0.05": 0.49324218749999993,
+    "n90": 5.853888888888889,
+    "nonzero": 0.881953125
+   },
+   "real DFT": {
+    "family": "Fourier family",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.9608984375,
+      "shifted@0.02": 0.9319921875,
+      "shifted_sd": 0.014003729187339482,
+      "n90": 6.0,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.853203125
+     },
+     "slope down": {
+      "shifted@0.01": 0.960859375,
+      "shifted@0.02": 0.9331640625,
+      "shifted_sd": 0.013354519859717673,
+      "n90": 6.0,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.8544140625
+     },
+     "offset": {
+      "shifted@0.01": 0.015625,
+      "shifted@0.02": 0.015625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.015625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.901953125,
+      "shifted@0.02": 0.8354296875,
+      "shifted_sd": 0.20379633277236575,
+      "n90": 4.5825,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.666015625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.889453125,
+      "shifted@0.02": 0.80828125,
+      "shifted_sd": 0.21220228455488527,
+      "n90": 4.5825,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.6017578125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.3256640625,
+      "shifted@0.02": 0.221015625,
+      "shifted_sd": 0.04168969903776441,
+      "n90": 1.0,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.1375390625
+     },
+     "local bump": {
+      "shifted@0.01": 0.246875,
+      "shifted@0.02": 0.227421875,
+      "shifted_sd": 0.019868801853895845,
+      "n90": 5.2925,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.1984765625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.78953125,
+      "shifted@0.02": 0.6612890625,
+      "shifted_sd": 0.2883917444706221,
+      "n90": 3.3925,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.48703125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.3323828125,
+      "shifted@0.02": 0.2498828125,
+      "shifted_sd": 0.092025073739592,
+      "n90": 3.1525,
+      "nonzero": 0.9315625,
+      "shifted@0.05": 0.1842578125
+     }
+    },
+    "shifted@0.01": 0.6025824652777777,
+    "shifted@0.02": 0.542677951388889,
+    "shifted@0.05": 0.44425781249999996,
+    "n90": 3.889166666666666,
+    "nonzero": 0.9315624999999998
+   },
+   "Walsh\u2013Hadamard": {
+    "family": "other",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.09375,
+      "shifted@0.02": 0.09375,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.089453125
+     },
+     "slope down": {
+      "shifted@0.01": 0.09375,
+      "shifted@0.02": 0.09375,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.0892578125
+     },
+     "offset": {
+      "shifted@0.01": 0.015625,
+      "shifted@0.02": 0.015625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.015625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.663984375,
+      "shifted@0.02": 0.5578515625,
+      "shifted_sd": 0.10371398300613131,
+      "n90": 5.17,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.4187890625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.6409375,
+      "shifted@0.02": 0.5355078125,
+      "shifted_sd": 0.10378957705931913,
+      "n90": 5.17,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.3862890625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.2117578125,
+      "shifted@0.02": 0.1878125,
+      "shifted_sd": 0.01330053746564401,
+      "n90": 3.0,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.14609375
+     },
+     "local bump": {
+      "shifted@0.01": 0.7325390625,
+      "shifted@0.02": 0.609140625,
+      "shifted_sd": 0.07092575446538708,
+      "n90": 8.165,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.4290625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.6781640625,
+      "shifted@0.02": 0.5740234375,
+      "shifted_sd": 0.16721202634790086,
+      "n90": 4.8275,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.4279296875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.7049609375,
+      "shifted@0.02": 0.601796875,
+      "shifted_sd": 0.14448248755120593,
+      "n90": 5.285,
+      "nonzero": 0.652421875,
+      "shifted@0.05": 0.448359375
+     }
+    },
+    "shifted@0.01": 0.4261631944444445,
+    "shifted@0.02": 0.36325086805555556,
+    "shifted@0.05": 0.27231770833333324,
+    "n90": 4.068611111111112,
+    "nonzero": 0.652421875
+   },
+   "orthogonal polynomials": {
+    "family": "polynomial",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.015625,
+      "shifted@0.02": 0.015625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.015625
+     },
+     "slope down": {
+      "shifted@0.01": 0.015625,
+      "shifted@0.02": 0.015625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.015625
+     },
+     "offset": {
+      "shifted@0.01": 0.015625,
+      "shifted@0.02": 0.015625,
+      "shifted_sd": 0.0,
+      "n90": 1.0,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.015625
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.1746875,
+      "shifted@0.02": 0.1584765625,
+      "shifted_sd": 0.03900681577937494,
+      "n90": 3.49,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.136484375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.170234375,
+      "shifted@0.02": 0.1546875,
+      "shifted_sd": 0.038033317014494014,
+      "n90": 3.49,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.1340625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.01578125,
+      "shifted@0.02": 0.0157421875,
+      "shifted_sd": 0.001348080775526359,
+      "n90": 1.0,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.015625
+     },
+     "local bump": {
+      "shifted@0.01": 0.3420703125,
+      "shifted@0.02": 0.3103515625,
+      "shifted_sd": 0.024047244301501444,
+      "n90": 7.46,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.25953125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.1944921875,
+      "shifted@0.02": 0.1766015625,
+      "shifted_sd": 0.05444363876750059,
+      "n90": 3.79,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.1526953125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.2072265625,
+      "shifted@0.02": 0.188828125,
+      "shifted_sd": 0.049786592914000206,
+      "n90": 4.34,
+      "nonzero": 0.174921875,
+      "shifted@0.05": 0.16515625
+     }
+    },
+    "shifted@0.01": 0.1279296875,
+    "shifted@0.02": 0.11684027777777778,
+    "shifted@0.05": 0.10115885416666666,
+    "n90": 2.9522222222222223,
+    "nonzero": 0.174921875
+   },
+   "PCA (learned)": {
+    "family": "data-driven",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.1234375,
+      "shifted@0.02": 0.108359375,
+      "shifted_sd": 0.011958740510997594,
+      "n90": 1.0,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.0848828125
+     },
+     "slope down": {
+      "shifted@0.01": 0.1237109375,
+      "shifted@0.02": 0.108828125,
+      "shifted_sd": 0.012241217754348421,
+      "n90": 1.0,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.084140625
+     },
+     "offset": {
+      "shifted@0.01": 0.118671875,
+      "shifted@0.02": 0.1084375,
+      "shifted_sd": 0.010897247358851683,
+      "n90": 2.0,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.098828125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.1709765625,
+      "shifted@0.02": 0.1540234375,
+      "shifted_sd": 0.022708419193023847,
+      "n90": 3.4275,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.129609375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.1643359375,
+      "shifted@0.02": 0.1462109375,
+      "shifted_sd": 0.021564162922742765,
+      "n90": 3.4275,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.126328125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.1412109375,
+      "shifted@0.02": 0.1240234375,
+      "shifted_sd": 0.012437281621041381,
+      "n90": 3.0,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.09875
+     },
+     "local bump": {
+      "shifted@0.01": 0.265234375,
+      "shifted@0.02": 0.2444921875,
+      "shifted_sd": 0.014047246501622436,
+      "n90": 6.1225,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.2073046875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.173515625,
+      "shifted@0.02": 0.154765625,
+      "shifted_sd": 0.03119516673676188,
+      "n90": 3.0375,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.133125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.1917578125,
+      "shifted@0.02": 0.169296875,
+      "shifted_sd": 0.0323545988749571,
+      "n90": 3.2925,
+      "nonzero": 0.1610546875,
+      "shifted@0.05": 0.1437109375
+     }
+    },
+    "shifted@0.01": 0.16365017361111114,
+    "shifted@0.02": 0.14649305555555556,
+    "shifted@0.05": 0.12296440972222222,
+    "n90": 2.9230555555555555,
+    "nonzero": 0.1610546875
+   },
+   "Haar": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.83296875,
+      "shifted@0.02": 0.648125,
+      "shifted_sd": 0.05110975475630851,
+      "n90": 4.0,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.41125
+     },
+     "slope down": {
+      "shifted@0.01": 0.8311328125,
+      "shifted@0.02": 0.6501171875,
+      "shifted_sd": 0.049146633053825196,
+      "n90": 4.0,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.40703125
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.8441796875,
+      "shifted@0.02": 0.7122265625,
+      "shifted_sd": 0.08155470770667438,
+      "n90": 4.625,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.5003125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.82171875,
+      "shifted@0.02": 0.6750390625,
+      "shifted_sd": 0.08357037311860942,
+      "n90": 4.625,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.465234375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.747109375,
+      "shifted@0.02": 0.556953125,
+      "shifted_sd": 0.0489987020515276,
+      "n90": 4.0,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.345390625
+     },
+     "local bump": {
+      "shifted@0.01": 0.39953125,
+      "shifted@0.02": 0.3594921875,
+      "shifted_sd": 0.026086936563677686,
+      "n90": 4.8975,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.2834765625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.854453125,
+      "shifted@0.02": 0.757109375,
+      "shifted_sd": 0.18486955322330492,
+      "n90": 6.015,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.585859375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.870546875,
+      "shifted@0.02": 0.7788671875,
+      "shifted_sd": 0.14544621179289044,
+      "n90": 6.2125,
+      "nonzero": 0.90375,
+      "shifted@0.05": 0.60109375
+     }
+    },
+    "shifted@0.01": 0.6925434027777777,
+    "shifted@0.02": 0.5743532986111111,
+    "shifted@0.05": 0.4034331597222222,
+    "n90": 4.486111111111111,
+    "nonzero": 0.90375
+   },
+   "db2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.1875,
+      "shifted@0.02": 0.1875,
+      "shifted_sd": 0.0,
+      "n90": 9.0,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.1875
+     },
+     "slope down": {
+      "shifted@0.01": 0.1875,
+      "shifted@0.02": 0.1875,
+      "shifted_sd": 0.0,
+      "n90": 9.0,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.1875
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.5149609375,
+      "shifted@0.02": 0.4193359375,
+      "shifted_sd": 0.10058555825171223,
+      "n90": 5.73,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.3194140625
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.482734375,
+      "shifted@0.02": 0.396953125,
+      "shifted_sd": 0.10093674414384177,
+      "n90": 5.73,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.293125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.3426171875,
+      "shifted@0.02": 0.2473046875,
+      "shifted_sd": 0.031687344943839076,
+      "n90": 4.0,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.1796484375
+     },
+     "local bump": {
+      "shifted@0.01": 0.383671875,
+      "shifted@0.02": 0.3070703125,
+      "shifted_sd": 0.03174123183400171,
+      "n90": 4.255,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.215234375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.5804296875,
+      "shifted@0.02": 0.4733984375,
+      "shifted_sd": 0.1752989868831138,
+      "n90": 5.0875,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.33234375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.6057421875,
+      "shifted@0.02": 0.4762890625,
+      "shifted_sd": 0.18736303184108544,
+      "n90": 4.3275,
+      "nonzero": 0.5258203125,
+      "shifted@0.05": 0.320390625
+     }
+    },
+    "shifted@0.01": 0.3684895833333333,
+    "shifted@0.02": 0.3029557291666667,
+    "shifted@0.05": 0.22960069444444445,
+    "n90": 5.45888888888889,
+    "nonzero": 0.5258203125
+   },
+   "db4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.3257421875,
+      "shifted@0.02": 0.29609375,
+      "shifted_sd": 0.015047937722076736,
+      "n90": 5.0,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.2486328125
+     },
+     "slope down": {
+      "shifted@0.01": 0.326875,
+      "shifted@0.02": 0.2964453125,
+      "shifted_sd": 0.015832556989944607,
+      "n90": 5.0,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.246953125
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.3603125,
+      "shifted@0.02": 0.3109375,
+      "shifted_sd": 0.04310348195041788,
+      "n90": 3.865,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.2633203125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.3427734375,
+      "shifted@0.02": 0.3008984375,
+      "shifted_sd": 0.04316346153427796,
+      "n90": 3.865,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.24125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.22421875,
+      "shifted@0.02": 0.187578125,
+      "shifted_sd": 0.021395269765987414,
+      "n90": 4.0,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.159765625
+     },
+     "local bump": {
+      "shifted@0.01": 0.2837109375,
+      "shifted@0.02": 0.2514453125,
+      "shifted_sd": 0.01851377067455044,
+      "n90": 4.35,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.1900390625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3636328125,
+      "shifted@0.02": 0.312109375,
+      "shifted_sd": 0.07628997255281572,
+      "n90": 4.075,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.245078125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.3359375,
+      "shifted@0.02": 0.278203125,
+      "shifted_sd": 0.086591228028504,
+      "n90": 4.0925,
+      "nonzero": 0.36515625,
+      "shifted@0.05": 0.2131640625
+     }
+    },
+    "shifted@0.01": 0.28827256944444446,
+    "shifted@0.02": 0.2516623263888889,
+    "shifted@0.05": 0.20438368055555556,
+    "n90": 4.0275,
+    "nonzero": 0.36515625
+   },
+   "db6": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.350859375,
+      "shifted@0.02": 0.3401171875,
+      "shifted_sd": 0.011518537093630585,
+      "n90": 8.0,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.3045703125
+     },
+     "slope down": {
+      "shifted@0.01": 0.3498046875,
+      "shifted@0.02": 0.340078125,
+      "shifted_sd": 0.011638003060421277,
+      "n90": 8.0,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.303984375
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.3544140625,
+      "shifted@0.02": 0.3283984375,
+      "shifted_sd": 0.041772243764503406,
+      "n90": 5.0525,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.2815234375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.3438671875,
+      "shifted@0.02": 0.320625,
+      "shifted_sd": 0.041559562866144296,
+      "n90": 5.0525,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.2661328125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.2396875,
+      "shifted@0.02": 0.1921875,
+      "shifted_sd": 0.022207297505549835,
+      "n90": 3.0,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.1447265625
+     },
+     "local bump": {
+      "shifted@0.01": 0.28140625,
+      "shifted@0.02": 0.245,
+      "shifted_sd": 0.019656473567885975,
+      "n90": 4.455,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.1803515625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3429296875,
+      "shifted@0.02": 0.3051953125,
+      "shifted_sd": 0.057130572224640325,
+      "n90": 4.235,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.2525
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.2821875,
+      "shifted@0.02": 0.2376953125,
+      "shifted_sd": 0.05108047359524815,
+      "n90": 3.73,
+      "nonzero": 0.3548828125,
+      "shifted@0.05": 0.1954296875
+     }
+    },
+    "shifted@0.01": 0.2862673611111111,
+    "shifted@0.02": 0.2600607638888889,
+    "shifted@0.05": 0.2178298611111111,
+    "n90": 4.836111111111111,
+    "nonzero": 0.3548828125
+   },
+   "sym4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.3265234375,
+      "shifted@0.02": 0.3166796875,
+      "shifted_sd": 0.008500111298673903,
+      "n90": 9.0,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.2868359375
+     },
+     "slope down": {
+      "shifted@0.01": 0.3263671875,
+      "shifted@0.02": 0.3162109375,
+      "shifted_sd": 0.008357458162240105,
+      "n90": 9.0,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.28640625
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.3733984375,
+      "shifted@0.02": 0.335390625,
+      "shifted_sd": 0.04439748275082018,
+      "n90": 5.735,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.2780078125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.3598046875,
+      "shifted@0.02": 0.3264453125,
+      "shifted_sd": 0.044718476343283915,
+      "n90": 5.735,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.2583984375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.181328125,
+      "shifted@0.02": 0.149140625,
+      "shifted_sd": 0.019091774396566053,
+      "n90": 3.0,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.1095703125
+     },
+     "local bump": {
+      "shifted@0.01": 0.2868359375,
+      "shifted@0.02": 0.2562109375,
+      "shifted_sd": 0.01718390409827155,
+      "n90": 4.205,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.19140625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3744921875,
+      "shifted@0.02": 0.320859375,
+      "shifted_sd": 0.07814652047346302,
+      "n90": 4.5325,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.254296875
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.32453125,
+      "shifted@0.02": 0.2701171875,
+      "shifted_sd": 0.08610756432670329,
+      "n90": 4.0075,
+      "nonzero": 0.370390625,
+      "shifted@0.05": 0.208984375
+     }
+    },
+    "shifted@0.01": 0.2871701388888889,
+    "shifted@0.02": 0.2580338541666667,
+    "shifted@0.05": 0.21168402777777778,
+    "n90": 5.2461111111111105,
+    "nonzero": 0.370390625
+   },
+   "sym6": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.3918359375,
+      "shifted@0.02": 0.3480078125,
+      "shifted_sd": 0.01981508602750298,
+      "n90": 7.0,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.3090625
+     },
+     "slope down": {
+      "shifted@0.01": 0.3927734375,
+      "shifted@0.02": 0.3492578125,
+      "shifted_sd": 0.01886840058211993,
+      "n90": 7.0,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.3104296875
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.376953125,
+      "shifted@0.02": 0.328984375,
+      "shifted_sd": 0.0454254384567103,
+      "n90": 5.54,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.2855859375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.36265625,
+      "shifted@0.02": 0.3241796875,
+      "shifted_sd": 0.047247849834302975,
+      "n90": 5.54,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.2709765625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.191953125,
+      "shifted@0.02": 0.1567578125,
+      "shifted_sd": 0.020766816827630177,
+      "n90": 3.0,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.1055078125
+     },
+     "local bump": {
+      "shifted@0.01": 0.2820703125,
+      "shifted@0.02": 0.24703125,
+      "shifted_sd": 0.017250594419106258,
+      "n90": 4.205,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.182421875
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3463671875,
+      "shifted@0.02": 0.3079296875,
+      "shifted_sd": 0.06362645763233911,
+      "n90": 4.425,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.2480078125
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.26859375,
+      "shifted@0.02": 0.2290234375,
+      "shifted_sd": 0.050085848541490174,
+      "n90": 3.8975,
+      "nonzero": 0.3927734375,
+      "shifted@0.05": 0.1898828125
+     }
+    },
+    "shifted@0.01": 0.293828125,
+    "shifted@0.02": 0.258046875,
+    "shifted@0.05": 0.21479166666666666,
+    "n90": 4.734166666666666,
+    "nonzero": 0.3927734375
+   },
+   "coif1": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.2450390625,
+      "shifted@0.02": 0.21890625,
+      "shifted_sd": 0.016864145814790028,
+      "n90": 6.0,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.1932421875
+     },
+     "slope down": {
+      "shifted@0.01": 0.2439453125,
+      "shifted@0.02": 0.2183984375,
+      "shifted_sd": 0.017691431693650287,
+      "n90": 6.0,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.1944921875
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.5051953125,
+      "shifted@0.02": 0.4148046875,
+      "shifted_sd": 0.10066034868973901,
+      "n90": 5.81,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.311171875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.480234375,
+      "shifted@0.02": 0.3909375,
+      "shifted_sd": 0.09901812886411256,
+      "n90": 5.81,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.287578125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.328125,
+      "shifted@0.02": 0.2364453125,
+      "shifted_sd": 0.0304985581354241,
+      "n90": 2.0,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.16390625
+     },
+     "local bump": {
+      "shifted@0.01": 0.378203125,
+      "shifted@0.02": 0.30546875,
+      "shifted_sd": 0.03036842457121377,
+      "n90": 4.6075,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.211640625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.5713671875,
+      "shifted@0.02": 0.4625390625,
+      "shifted_sd": 0.1742937014712769,
+      "n90": 4.9925,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.32359375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.6009375,
+      "shifted@0.02": 0.4727734375,
+      "shifted_sd": 0.1824021795778386,
+      "n90": 4.42,
+      "nonzero": 0.5182421875,
+      "shifted@0.05": 0.3196875
+     }
+    },
+    "shifted@0.01": 0.37603298611111113,
+    "shifted@0.02": 0.30572482638888887,
+    "shifted@0.05": 0.22628472222222223,
+    "n90": 4.626666666666667,
+    "nonzero": 0.5182421875
+   },
+   "coif2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.315625,
+      "shifted@0.02": 0.2887890625,
+      "shifted_sd": 0.014820654318672766,
+      "n90": 5.0,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.266484375
+     },
+     "slope down": {
+      "shifted@0.01": 0.314609375,
+      "shifted@0.02": 0.2897265625,
+      "shifted_sd": 0.015094055299060414,
+      "n90": 5.0,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.2670703125
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.3531640625,
+      "shifted@0.02": 0.3075390625,
+      "shifted_sd": 0.04134486531824228,
+      "n90": 4.9725,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.2601171875
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.3406640625,
+      "shifted@0.02": 0.3014453125,
+      "shifted_sd": 0.041434081890272936,
+      "n90": 4.9725,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.2468359375
+     },
+     "added curvature": {
+      "shifted@0.01": 0.223046875,
+      "shifted@0.02": 0.1883984375,
+      "shifted_sd": 0.019131494952593062,
+      "n90": 3.0,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.120625
+     },
+     "local bump": {
+      "shifted@0.01": 0.28359375,
+      "shifted@0.02": 0.2553125,
+      "shifted_sd": 0.01630848849142679,
+      "n90": 4.4325,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.189140625
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3523046875,
+      "shifted@0.02": 0.3032421875,
+      "shifted_sd": 0.07789253500353768,
+      "n90": 4.225,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.235
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.3307421875,
+      "shifted@0.02": 0.278828125,
+      "shifted_sd": 0.07900438668348976,
+      "n90": 3.9275,
+      "nonzero": 0.3621875,
+      "shifted@0.05": 0.2123046875
+     }
+    },
+    "shifted@0.01": 0.2827777777777778,
+    "shifted@0.02": 0.24939236111111113,
+    "shifted@0.05": 0.203203125,
+    "n90": 4.17,
+    "nonzero": 0.3621875
+   },
+   "bior2.2": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.171875,
+      "shifted@0.02": 0.171875,
+      "shifted_sd": 0.0,
+      "n90": 6.0,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.1662109375
+     },
+     "slope down": {
+      "shifted@0.01": 0.171875,
+      "shifted@0.02": 0.171875,
+      "shifted_sd": 0.0,
+      "n90": 6.0,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.167421875
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.4302734375,
+      "shifted@0.02": 0.3499609375,
+      "shifted_sd": 0.09638800697277433,
+      "n90": 4.875,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.2555078125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.4056640625,
+      "shifted@0.02": 0.327109375,
+      "shifted_sd": 0.09324836496346398,
+      "n90": 4.875,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.2371875
+     },
+     "added curvature": {
+      "shifted@0.01": 0.2648828125,
+      "shifted@0.02": 0.1898046875,
+      "shifted_sd": 0.027756895566054283,
+      "n90": 2.0,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.1269921875
+     },
+     "local bump": {
+      "shifted@0.01": 0.324609375,
+      "shifted@0.02": 0.2542578125,
+      "shifted_sd": 0.03284315439368368,
+      "n90": 3.84,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.173203125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.4963671875,
+      "shifted@0.02": 0.3894921875,
+      "shifted_sd": 0.1660204916566095,
+      "n90": 4.0975,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.2672265625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.5270703125,
+      "shifted@0.02": 0.3960546875,
+      "shifted_sd": 0.17448427338220154,
+      "n90": 3.67,
+      "nonzero": 0.4317578125,
+      "shifted@0.05": 0.2613671875
+     }
+    },
+    "shifted@0.01": 0.31376302083333335,
+    "shifted@0.02": 0.25351996527777776,
+    "shifted@0.05": 0.1873741319444444,
+    "n90": 4.150833333333334,
+    "nonzero": 0.4317578125
+   },
+   "bior4.4": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.304140625,
+      "shifted@0.02": 0.2853125,
+      "shifted_sd": 0.01096425299553052,
+      "n90": 6.0,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.252578125
+     },
+     "slope down": {
+      "shifted@0.01": 0.30328125,
+      "shifted@0.02": 0.28734375,
+      "shifted_sd": 0.011618319653138314,
+      "n90": 6.0,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.2526953125
+     },
+     "offset": {
+      "shifted@0.01": 0.03125,
+      "shifted@0.02": 0.03125,
+      "shifted_sd": 0.0,
+      "n90": 2.0,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.03125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.3384375,
+      "shifted@0.02": 0.2991015625,
+      "shifted_sd": 0.042453426198554266,
+      "n90": 5.2075,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.243828125
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.3221484375,
+      "shifted@0.02": 0.2891796875,
+      "shifted_sd": 0.04199883668287544,
+      "n90": 5.2075,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.2336328125
+     },
+     "added curvature": {
+      "shifted@0.01": 0.1751171875,
+      "shifted@0.02": 0.144609375,
+      "shifted_sd": 0.020875461961580036,
+      "n90": 2.0,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.10546875
+     },
+     "local bump": {
+      "shifted@0.01": 0.2697265625,
+      "shifted@0.02": 0.23703125,
+      "shifted_sd": 0.0202589438196442,
+      "n90": 4.01,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.16953125
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.3345703125,
+      "shifted@0.02": 0.28703125,
+      "shifted_sd": 0.07016146973900632,
+      "n90": 4.2225,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.230234375
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.308984375,
+      "shifted@0.02": 0.2528515625,
+      "shifted_sd": 0.07526676799721173,
+      "n90": 3.6675,
+      "nonzero": 0.3362890625,
+      "shifted@0.05": 0.196015625
+     }
+    },
+    "shifted@0.01": 0.2652951388888889,
+    "shifted@0.02": 0.23485677083333334,
+    "shifted@0.05": 0.1905815972222222,
+    "n90": 4.257222222222222,
+    "nonzero": 0.3362890625
+   },
+   "dmey": {
+    "family": "wavelet",
+    "edits": {
+     "slope up": {
+      "shifted@0.01": 0.5394140625,
+      "shifted@0.02": 0.467421875,
+      "shifted_sd": 0.026437089055612286,
+      "n90": 6.0,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.3575
+     },
+     "slope down": {
+      "shifted@0.01": 0.5374609375,
+      "shifted@0.02": 0.46875,
+      "shifted_sd": 0.025,
+      "n90": 6.0,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.358359375
+     },
+     "offset": {
+      "shifted@0.01": 0.0666015625,
+      "shifted@0.02": 0.0483984375,
+      "shifted_sd": 0.015648371193069704,
+      "n90": 2.0,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.03703125
+     },
+     "growing amplitude": {
+      "shifted@0.01": 0.49140625,
+      "shifted@0.02": 0.4148828125,
+      "shifted_sd": 0.08132845333447171,
+      "n90": 5.28,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.3249609375
+     },
+     "decaying amplitude": {
+      "shifted@0.01": 0.4686328125,
+      "shifted@0.02": 0.4024609375,
+      "shifted_sd": 0.08209252733613208,
+      "n90": 5.28,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.287265625
+     },
+     "added curvature": {
+      "shifted@0.01": 0.2673046875,
+      "shifted@0.02": 0.2084375,
+      "shifted_sd": 0.02836012826134607,
+      "n90": 2.0,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.136875
+     },
+     "local bump": {
+      "shifted@0.01": 0.2723046875,
+      "shifted@0.02": 0.2517578125,
+      "shifted_sd": 0.019577094633201928,
+      "n90": 4.22,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.21375
+     },
+     "time shift (delay 6%)": {
+      "shifted@0.01": 0.4203515625,
+      "shifted@0.02": 0.35328125,
+      "shifted_sd": 0.10116255386598097,
+      "n90": 4.2225,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.262265625
+     },
+     "frequency drift (time warp)": {
+      "shifted@0.01": 0.278046875,
+      "shifted@0.02": 0.2325,
+      "shifted_sd": 0.06043583568028989,
+      "n90": 3.7375,
+      "nonzero": 0.5083203125,
+      "shifted@0.05": 0.1803125
+     }
+    },
+    "shifted@0.01": 0.37128038194444446,
+    "shifted@0.02": 0.31643229166666664,
+    "shifted@0.05": 0.23981336805555553,
+    "n90": 4.304444444444444,
+    "nonzero": 0.5083203125
+   }
+  }
+ }
+}

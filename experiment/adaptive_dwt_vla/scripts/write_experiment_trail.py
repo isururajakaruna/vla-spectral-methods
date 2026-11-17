@@ -492,6 +492,30 @@ def build_nodes():
          res or "Queued after the Haar epoch-2 evaluation.", "Epochs 1–3 of the Haar run used soft labels + weighting while DCT uses plain cross-entropy; on Haar the loss "
          "made no difference at one task (3 seeds) or at epoch 4 of the full run.",
          short=(f"DCT {doneep[-1][1]:.0f}% @ epoch {doneep[-1][0]}" if doneep else "queued" if dst == "planned" else "running"), link="training_report.html")
+    f_plain = "full40_dwt_fixed@full_s0_dwt_fixed:step_{:05d}"
+    pst, ps_ = run_status("full_s0_dwt_fixed")
+    plain_ep = [(e, fpct(f_plain.format(s))) for e, s in ep_steps[:2]]
+    pdone = [(e, p) for e, p in plain_ep if p is not None]
+    pres = ("Same 400 episodes. " + ", ".join(
+        f"epoch {e}: plain Haar {p:.1f}% vs soft + weighted Haar {dict(haar_ep)[e]:.1f}%"
+        + (f" and DCT {dict(dct_ep)[e]:.1f}%" if dict(dct_ep).get(e) is not None else "") for e, p in pdone) + ".") if pdone else ""
+    if pst == "running" and ps_:
+        pres += f" Training: step {ps_.get('step', 0)} / {ps_.get('stop_at', 0)}."
+    node("FPLAIN", "FULL", "Full LIBERO loss control · plain Haar from scratch, 2 epochs",
+         "done" if plain_ep[1][1] is not None else (pst if pst in ("failed", "planned") else "running"),
+         "After one epoch DCT without BPE (plain cross-entropy) led the Haar run (soft labels + weighting) by 24 points, the reverse of the "
+         "single-task result. The Haar run differs in both transform and loss, and soft labels + weighting learned more slowly in "
+         "mid-training on one task, so train Haar with plain cross-entropy from scratch to separate the two.",
+         "Is DCT's early lead the transform, or did the soft + weighted loss slow Haar down?",
+         [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
+          ("Training", lora("Haar fixed (dwt_fixed), plain cross-entropy, seed 0, warmup 300, the same learning-rate history for "
+                            "two epochs (29,000-step cosine for epoch 1, resumed under 43,500 steps for epoch 2)")),
+          ("Compared with", "The soft + weighted Haar run and the DCT control at the same epoch."),
+          ("Evaluation", "400 episodes after each epoch, the same as the other full runs.")],
+         pres or "Queued after DCT epoch 2.", "If plain Haar matches DCT, the loss slowed the first run down; if it stays near the "
+         "soft + weighted run, DCT's transform is genuinely better at this scale.",
+         short=(f"plain Haar {pdone[-1][1]:.0f}% @ epoch {pdone[-1][0]}" if pdone else "queued" if pst == "planned" else "running"),
+         link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",
