@@ -52,9 +52,12 @@ def parse_args():
     ap.add_argument("--variant", required=True, choices=["fast_matched", "dwt_fixed", "dwt_adaptive", "dwt_fixed_bpe", "dwt_adaptive_bpe", "dwt_fixed_s4h", "dwt_adaptive_s4h",
                                                        "dwt_fixed_s4h_bpe", "dwt_adaptive_s4h_bpe",
                                                        "dwt_fixed_compact", "dwt_fixed_compact_bpe", "dct_fixed",
-                                                       "dwt_fixed_lw", "dwt_fixed_slw"])
+                                                       "dwt_fixed_lw", "dwt_fixed_slw", "poly_fixed"])
     ap.add_argument("--soft-sigma", type=float, default=0.007,
                     help="dwt_fixed_slw: soft-label width in normalized action units (coefficient error)")
+    ap.add_argument("--weight-power", type=float, default=None,
+                    help="weight coefficient-token losses by quantizer step ** p (any variant); "
+                         "default 1 for dwt_fixed_lw / dwt_fixed_slw, off otherwise")
     ap.add_argument("--name", required=True)
     ap.add_argument("--tasks", type=int, nargs="+", default=[24])
     ap.add_argument("--horizon", type=int, default=10)
@@ -170,8 +173,8 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
     codec = None
     if args.variant != "fast_matched":
         cal = windows(idx, window_starts(idx, train_eps, H, stride=1), H, stats)
-        if args.variant == "dct_fixed":
-            codec = WindowDWTCodec.fit(spec, cal, ["dct"], "orthonormal", levels=len(dct_bands(H)) - 1)
+        if args.variant in ("dct_fixed", "poly_fixed"):
+            codec = WindowDWTCodec.fit(spec, cal, [args.variant.split("_")[0]], "orthonormal", levels=len(dct_bands(H)) - 1)
             args.max_action_tokens = max(args.max_action_tokens, codec.max_stream_tokens + 8)
         elif "_s4h" in args.variant:
             codec = WindowDWTCodec.fit(spec, cal, ["sym4", "haar"], "symmetric", levels=WINDOW_LEVELS[H])
@@ -183,7 +186,7 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
                 codec = CompactDWTCodec(codec, choice["fixed"]["plan"])
     gamma = choice["adaptive"]["weights"]["gamma"]
     fixed_plan = []
-    if args.variant.startswith(("dwt_fixed", "dct_fixed")):
+    if args.variant.startswith(("dwt_fixed", "dct_fixed", "poly_fixed")):
         fixed_plan = [list(p) for p in (codec.full_plan() if hasattr(codec, "full_plan") else choice["fixed"]["plan"])]
     bpe_stats = None
     if args.variant.endswith("_bpe"):
@@ -237,7 +240,11 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
     val_loader = torch.utils.data.DataLoader(val_ds, batch_size=args.micro_batch, shuffle=False, num_workers=2)
 
     tok = policy._paligemma_tokenizer
-    loss_kw = dict(codec=codec, coef_weight=args.variant in ("dwt_fixed_lw", "dwt_fixed_slw"),
+    power = args.weight_power if args.weight_power is not None else (
+        1.0 if args.variant in ("dwt_fixed_lw", "dwt_fixed_slw") else 0.0)
+    if power and codec is None:
+        raise ValueError("--weight-power needs a DWT/DCT codec")
+    loss_kw = dict(codec=codec, coef_weight=power,
                    soft_sigma=args.soft_sigma if args.variant == "dwt_fixed_slw" else 0.0)
     prefix_ids = tok.encode("Action: ", add_special_tokens=False)
     bar_id = tok.convert_tokens_to_ids("|")

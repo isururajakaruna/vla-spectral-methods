@@ -41,11 +41,27 @@ BASE_REVISION = "308eb844dabdf46cd9dcd5138c1988b7a234f1d9"
 # --------------------------------------------------------------------------- training loss
 def coef_targets(targets: torch.Tensor, codec: AdaptiveDWTCodec) -> tuple[torch.Tensor, torch.Tensor]:
     """Per shifted target position: quantization bin (-1 if not a coefficient token) and the quantizer step of
-    that coefficient (its segment length, wavelet group and dimension; 0 elsewhere). Segment codec only."""
-    v, q, n_cont = codec.vocab, codec.quantizer, codec.spec.n_cont
+    that coefficient (its segment length, wavelet group and dimension; 0 elsewhere). Segment and window codecs."""
+    v, n_cont = codec.vocab, codec.spec.n_cont
     local = pali_to_local(targets.cpu().numpy())
     bins = np.full(local.shape, -1, dtype=np.int64)
     steps = np.zeros(local.shape, dtype=np.float32)
+    if getattr(codec, "kind", None) == "window":
+        for b in range(local.shape[0]):
+            k = -1
+            for t, tok in enumerate(local[b]):
+                cls = v.token_class(int(tok)) if 0 <= tok < v.size else "invalid"
+                if cls == "res":
+                    k = 0
+                elif cls == "coef" and k >= 0:
+                    c, d = divmod(k, n_cont)
+                    steps[b, t] = codec.step[c, d]
+                    bins[b, t] = int(tok)
+                    k += 1
+                elif k >= 0:
+                    k = -1
+        return torch.from_numpy(bins).to(targets.device), torch.from_numpy(steps).to(targets.device)
+    q = codec.quantizer
     for b in range(local.shape[0]):
         length, k = 0, 0
         for t, tok in enumerate(local[b]):
@@ -60,10 +76,11 @@ def coef_targets(targets: torch.Tensor, codec: AdaptiveDWTCodec) -> tuple[torch.
     return torch.from_numpy(bins).to(targets.device), torch.from_numpy(steps).to(targets.device)
 
 
-def token_forward(policy, batch, codec=None, coef_weight: bool = False, soft_sigma: float = 0.0) -> dict:
-    """``coef_weight``: weight each coefficient token's loss by its quantizer step (normalized to mean 1 over the
-    coefficient tokens of the batch), i.e. by the trajectory error a one-bin miss causes under the orthonormal Haar
-    basis. ``soft_sigma`` > 0: coefficient tokens get a discretized-Gaussian target over neighbouring bins,
+def token_forward(policy, batch, codec=None, coef_weight: float = 0.0, soft_sigma: float = 0.0) -> dict:
+    """``coef_weight`` = p > 0: weight each coefficient token's loss by its quantizer step to the power p (normalized
+    to mean 1 over the coefficient tokens of the batch); p = 1 weights by the trajectory error a one-bin miss causes
+    under an orthonormal basis, p = 0.5 is a gentler version (True means 1). ``soft_sigma`` > 0: coefficient tokens
+    get a discretized-Gaussian target over neighbouring bins,
     q(b) ∝ exp(-((b - b*) step)² / 2σ²), σ in normalized action units. ``per_token`` is always the plain one-hot
     cross-entropy, so logged train/val losses stay comparable with the baseline."""
     model = policy.model
@@ -90,7 +107,7 @@ def token_forward(policy, batch, codec=None, coef_weight: bool = False, soft_sig
     return {"loss": loss, "per_token": per_tok.detach(), "pred": logits.detach().argmax(-1), "targets": targets, "mask": mask}
 
 
-def action_token_loss(logits, targets, mask, codec=None, coef_weight: bool = False, soft_sigma: float = 0.0):
+def action_token_loss(logits, targets, mask, codec=None, coef_weight: float = 0.0, soft_sigma: float = 0.0):
     """Returns (training loss, plain one-hot cross-entropy per position); see ``token_forward``."""
     flat = logits.float()
     per_tok = F.cross_entropy(flat.reshape(-1, flat.shape[-1]), targets.reshape(-1), reduction="none")
@@ -111,7 +128,8 @@ def action_token_loss(logits, targets, mask, codec=None, coef_weight: bool = Fal
             train_tok[is_coef] = -(q * logp).sum(-1)
         if coef_weight and is_coef.any():
             w = torch.ones_like(train_tok)
-            w[is_coef] = steps[is_coef] / steps[is_coef].mean()
+            sp = steps[is_coef] ** float(coef_weight)
+            w[is_coef] = sp / sp.mean()
             train_tok = train_tok * w
     return (train_tok * mask).sum() / mask.sum().clamp(min=1), per_tok
 
@@ -309,7 +327,7 @@ def make_config(variant: str, horizon: int, max_action_tokens: int, device: str 
         max_decoding_steps=max_action_tokens, action_tokenizer_name="jadechoghari/tokenizer-lib-mean",
         empty_cameras=empty_cameras, device=device, dtype="bfloat16",
         gradient_checkpointing=kw.pop("gradient_checkpointing", True),
-        dwt_mode="fixed" if variant.startswith(("dwt_fixed", "dct_fixed")) else "adaptive", **kw,
+        dwt_mode="fixed" if variant.startswith(("dwt_fixed", "dct_fixed", "poly_fixed")) else "adaptive", **kw,
     )
     cfg.input_features = {
         "observation.images.image": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 256, 256)),

@@ -464,10 +464,11 @@ def build_nodes():
                                 "soft labels + weighting")),
               ("Compared with", "lerobot/pi0fast-libero (fully fine-tuned by LeRobot on all of LIBERO), evaluated by us unmodified."),
               ("Evaluation", "All four suites, every task, initial states 0–9: 400 episodes per model, the same for every model.")],
-             res, "Success rose steeply to epoch 3, then epoch 4 changed nothing for any loss (paired p ≥ 0.3), so the recipe plateaus at about "
-             "three quarters; validation token loss bottomed out around epoch 1 while training loss kept falling. The loss variants tie plain "
-             "cross-entropy here too. The ≈13-point gap to π₀-FAST LIBERO is mostly LIBERO-10 (≈57–61% vs 87%). One seed; 10 episodes per "
-             "task gives about ±4 points on the overall rate (the standard protocol uses 50).", short=short_f, link="training_report.html")
+             res, "Success rose steeply to epoch 3, then epoch 4 changed nothing for any loss (paired p ≥ 0.3), so this run plateaus at about "
+             "three quarters; validation token loss bottomed out around epoch 1 while training loss kept falling. The later plain-Haar run "
+             "showed the soft + weighted loss of epochs 1–3 had slowed it down. The ≈13-point gap to π₀-FAST LIBERO is mostly LIBERO-10 "
+             "(≈57–61% vs 87%). One seed; 10 episodes per task gives about ±4 points on the overall rate (the standard protocol uses 50).",
+             short=short_f, link="training_report.html")
     dst, ds = run_status("full_s0_dct_fixed")
     dct_ep = [(e, fpct(f_dct.format(s))) for e, s in ep_steps]
     hmatch = dict(haar_ep + [(4, e4[0][1])])
@@ -489,8 +490,9 @@ def build_nodes():
           ("Compared with", "The Haar run at the same epoch (epochs 1–3 soft labels + weighting, epoch 4 plain cross-entropy), and "
            "π₀-FAST LIBERO."),
           ("Evaluation", "400 episodes after every epoch, the same as the Haar run.")],
-         res or "Queued after the Haar epoch-2 evaluation.", "Epochs 1–3 of the Haar run used soft labels + weighting while DCT uses plain cross-entropy; on Haar the loss "
-         "made no difference at one task (3 seeds) or at epoch 4 of the full run.",
+         res or "Queued after the Haar epoch-2 evaluation.", "DCT leads at every epoch. Epochs 1–3 of the Haar run used soft labels + "
+         "weighting while DCT uses plain cross-entropy, so part of that lead was the loss; the plain-Haar control isolates the transform "
+         "(DCT still ahead at epochs 1 and 2).",
          short=(f"DCT {doneep[-1][1]:.0f}% @ epoch {doneep[-1][0]}" if doneep else "queued" if dst == "planned" else "running"), link="training_report.html")
     f_plain = "full40_dwt_fixed@full_s0_dwt_fixed:step_{:05d}"
     pst, ps_ = run_status("full_s0_dwt_fixed")
@@ -512,10 +514,69 @@ def build_nodes():
                             "two epochs (29,000-step cosine for epoch 1, resumed under 43,500 steps for epoch 2)")),
           ("Compared with", "The soft + weighted Haar run and the DCT control at the same epoch."),
           ("Evaluation", "400 episodes after each epoch, the same as the other full runs.")],
-         pres or "Queued after DCT epoch 2.", "If plain Haar matches DCT, the loss slowed the first run down; if it stays near the "
+         pres or "Queued after DCT epoch 2.", "Both effects are real. Plain Haar beats soft + weighted Haar (69.0% → 79.2% at epoch 2, "
+         "paired p ≈ 1e-4), so the modified loss slowed Haar down; DCT still beats plain Haar at the same epoch (77.0% vs 58.5% at epoch 1, "
+         "85.5% vs 79.2% at epoch 2, p ≈ 0.006), so the transform matters too, and more."
+         if plain_ep[1][1] is not None else "If plain Haar matches DCT, the loss slowed the first run down; if it stays near the "
          "soft + weighted run, DCT's transform is genuinely better at this scale.",
          short=(f"plain Haar {pdone[-1][1]:.0f}% @ epoch {pdone[-1][0]}" if pdone else "queued" if pst == "planned" else "running"),
          link="training_report.html")
+
+    def one(model, run):
+        p = fpct(model)
+        st_, s_ = run_status(run)
+        status = "done" if p is not None else (st_ if st_ in ("failed", "planned") else "running")
+        extra = f" Training: step {s_.get('step', 0)} / {s_.get('stop_at', 0)}." if st_ == "running" and s_ else ""
+        return p, status, extra
+
+    sqrtw_setup = ("Coefficient-token loss × quantizer step<sup>0.5</sup>, normalized to mean 1 per batch (DCT weights 0.56–2.8, against "
+                   "0.25–6.4 for full step weighting); structure and gripper tokens weight 1; no soft labels")
+    pw, stw, xw = one("full40_dct_fixed@full_e3_dct_fixed_sqrtw:step_43500", "full_e3_dct_fixed_sqrtw")
+    d2, d3 = fpct(f_dct.format(29000)), fpct(f_dct.format(43500))
+    node("FDCTW", "FDCT", "DCT + √step weighting · 1 epoch from DCT epoch 2", stw,
+         "Full step weighting did not help Haar, but on DCT the step sizes put most of the weight on the few low-frequency tokens that "
+         "carry each motion's fingerprint (transform fingerprint study). A gentler √step weighting keeps the fine tokens at more than half "
+         "weight. Branching from the plain epoch-2 checkpoint gives a matched comparison with plain DCT epoch 3.",
+         "Does a gentle step weighting improve DCT beyond what one more plain epoch gives?",
+         [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
+          ("Training", lora("DCT without BPE, " + sqrtw_setup + ". Adapters + optimizer from plain DCT step 29,000, trained to step 43,500 "
+                            "under the 43,500-step cosine, exactly like plain DCT epoch 3")),
+          ("Compared with", "Plain DCT epoch 2 (its start) and epoch 3 (same start and schedule, plain loss); π₀-FAST LIBERO."),
+          ("Evaluation", "400 episodes, the same as every full run.")],
+         (f"Same 400 episodes: {pw:.1f}%, against plain DCT epoch 2 {d2:.1f}%" + (f" and epoch 3 {d3:.1f}%" if d3 is not None else "")
+          + (f"; π₀-FAST LIBERO {f_ref:.1f}%" if f_ref is not None else "") + "." if pw is not None else "Queued." + xw),
+         "The gain over epoch 2 is almost all LIBERO-10 (66% → 80%, paired p = 0.02); overall it is level with π₀-FAST LIBERO (p = 0.53). "
+         "Plain DCT epoch 3 decides whether that is the weighting or the extra epoch." if pw is not None else
+         "Compared against plain DCT epoch 3 once both are in.",
+         short=(f"{pw:.0f}% @ epoch 3" if pw is not None else stw), link="training_report.html")
+    ps0, sts0, xs0 = one("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_14500", "full_s0_dct_fixed_sqrtw")
+    d1 = fpct(f_dct.format(14500))
+    node("FDCTWS", "FDCTW", "DCT + √step weighting · from scratch, 1 epoch", sts0,
+         "The branch from epoch 2 only shows the weighting as a late fine-tune. On Haar the modified loss hurt most early in training, so "
+         "train the same weighting from scratch and compare with plain DCT epoch 1.",
+         "Does √step weighting help or hurt DCT when used from the start?",
+         [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
+          ("Training", lora("DCT without BPE, " + sqrtw_setup + ". From scratch, one epoch under the 29,000-step cosine, like plain "
+                            "DCT epoch 1")),
+          ("Compared with", "Plain DCT epoch 1."), ("Evaluation", "400 episodes.")],
+         (f"Same 400 episodes: {ps0:.1f}% against plain DCT epoch 1 {d1:.1f}%." if ps0 is not None else "Queued after plain DCT epoch 3." + xs0),
+         "See the training report for the paired test." if ps0 is not None else "Pending.",
+         short=(f"{ps0:.0f}% @ epoch 1" if ps0 is not None else sts0), link="training_report.html")
+    pp, stp, xp = one("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_14500", "full_s0_poly_fixed_sqrtw")
+    node("FPOLY", "FDCTWS", "Orthogonal polynomials + √step weighting · from scratch, 1 epoch", stp,
+         "In the synthetic studies orthogonal polynomials ranked first of 18 transforms: a smooth edit of a motion moves the fewest tokens "
+         "(22% vs 30% for DCT and 69% for Haar), and different edits land on different tokens. Offline on LIBERO chunks the polynomial "
+         "codec is as accurate as DCT at the same 64 tokens (MSE 1.64e-4 vs 1.65e-4).",
+         "Does the best basis in the synthetic studies beat DCT as a VLA action tokenizer?",
+         [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
+          ("Training", lora("poly_fixed: Legendre polynomials orthonormalized on the 10 sample points, grouped by degree (0, 1, 2–3, 4–9) "
+                            "like the DCT bands, same quantizer, vocabulary and grammar, no BPE; " + sqrtw_setup + ". From scratch, one "
+                            "epoch under the 29,000-step cosine")),
+          ("Compared with", "√step-weighted DCT from scratch (same loss) and plain DCT at epoch 1."), ("Evaluation", "400 episodes.")],
+         (f"Same 400 episodes: {pp:.1f}%" + (f" against √step-weighted DCT {ps0:.1f}%" if ps0 is not None else "")
+          + f" and plain DCT {d1:.1f}% at epoch 1." if pp is not None else "Queued after √step-weighted DCT from scratch." + xp),
+         "See the training report for the paired tests." if pp is not None else "Pending.",
+         short=(f"{pp:.0f}% @ epoch 1" if pp is not None else stp), link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",

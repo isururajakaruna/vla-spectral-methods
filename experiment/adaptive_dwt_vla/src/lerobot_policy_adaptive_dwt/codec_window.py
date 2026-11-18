@@ -11,7 +11,8 @@ wavelet groups ``cA_J, cD_J, ..., cD_(J-k+1)``; ``k = J`` is full resolution. A 
 
 ``waves=["dct"]`` uses the orthonormal DCT-II instead (FAST's transform, no BPE): coefficients are grouped
 into octave bands (DC, f1, f2–3, f4–7, ...; the last band takes the remainder), which play the role of
-wavelet levels for the quantizer and for ``RES_k``.
+wavelet levels for the quantizer and for ``RES_k``. ``waves=["poly"]`` uses orthonormal polynomials on the H sample
+points (Legendre, QR-orthonormalized) grouped the same way by degree (0, 1, 2–3, 4–...).
 """
 
 from __future__ import annotations
@@ -60,6 +61,14 @@ def dct_matrices(horizon: int):
     return A, A.T.copy(), dct_bands(horizon)
 
 
+def poly_matrices(horizon: int):
+    """Orthonormal polynomial basis on the H sample points (Legendre, QR-orthonormalized), rows by degree."""
+    t = np.linspace(-1, 1, horizon)
+    q, _ = np.linalg.qr(np.polynomial.legendre.legvander(t, horizon - 1))
+    q *= np.sign(q[-1])
+    return q.T.copy(), q.copy(), dct_bands(horizon)
+
+
 def transform_matrices(waves, mode, horizon, levels):
     """Analysis A (n_coef, H), synthesis S (H, n_coef), coefficient count per group (cA_J, cD_J, ..., cD_1)."""
     with warnings.catch_warnings():
@@ -89,10 +98,10 @@ class WindowDWTCodec:
         self.vocab = Vocab(n_bins=spec.n_bins, max_len=32)
         if levels > 5 or spec.horizon > self.vocab.max_len:
             raise ValueError("levels must be <= 5 and horizon <= 32")
-        if self.waves == ["dct"]:
-            self.A, self.S, self.group_sizes = dct_matrices(spec.horizon)
+        if self.waves in (["dct"], ["poly"]):
+            self.A, self.S, self.group_sizes = (dct_matrices if self.waves == ["dct"] else poly_matrices)(spec.horizon)
             if len(self.group_sizes) - 1 != levels:
-                raise ValueError(f"DCT at H={spec.horizon} has {len(self.group_sizes) - 1} levels, got {levels}")
+                raise ValueError(f"{self.waves[0]} at H={spec.horizon} has {len(self.group_sizes) - 1} levels, got {levels}")
         else:
             self.A, self.S, self.group_sizes = transform_matrices(self.waves, mode, spec.horizon, levels)
         if np.abs(self.S @ self.A - np.eye(spec.horizon)).max() > 1e-8:
