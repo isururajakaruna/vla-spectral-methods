@@ -114,6 +114,7 @@ FULL_REF = "full40_ref_pi0fast_libero"
 FULL_EPOCH = {14500: 1, 29000: 2, 43500: 3, 58000: 4}
 FULL_LOSS = {"dwt_fixed": "plain cross-entropy", "dwt_fixed_lw": "scale-weighted", "dwt_fixed_slw": "soft labels + scale-weighted",
              "dct_fixed": "plain cross-entropy", "poly_fixed": "plain cross-entropy"}
+BW5 = "5-level stepped weights (0.3–1.5)"
 
 
 def load_full():
@@ -134,14 +135,16 @@ def load_full():
             continue
         v, run, ep = g.group(1), g.group(2), FULL_EPOCH[int(g.group(3))]
         sqrtw = label.endswith(f"_sqrtw:step_{g.group(3)}")
-        tok = ("poly" if v == "poly_fixed" else ("dctw" if sqrtw else "dct") if v == "dct_fixed"
+        bw5 = label.endswith(f"_bw5:step_{g.group(3)}")
+        tok = ("poly" if v == "poly_fixed" else ("dctw" if sqrtw else "dctb" if bw5 else "dct") if v == "dct_fixed"
                else "haarp" if (run, v) == ("full_s0", "dwt_fixed") else "haar")
         name = {"dct": f"DCT, no BPE · epoch {ep}", "dctw": f"DCT, no BPE · epoch {ep}" + (" (from epoch 2)" if run == "full_e3" else " (from scratch)"),
+                "dctb": f"DCT, no BPE · epoch {ep} (from epoch 3)",
                 "poly": f"Orthogonal polynomials, no BPE · epoch {ep} (from scratch)",
                 "haarp": f"Haar DWT fixed, plain from scratch · epoch {ep}",
                 "haar": f"Haar DWT fixed · epoch {ep}" + (" (from epoch 3)" if run == "full_e4" else "")}[tok]
-        out.append((label, name, tok, ep, "√step-weighted" if sqrtw else FULL_LOSS[v], m))
-    order = {"haar": 0, "haarp": 1, "dct": 2, "dctw": 3, "poly": 4, "ref": 5}
+        out.append((label, name, tok, ep, "√step-weighted" if sqrtw else BW5 if bw5 else FULL_LOSS[v], m))
+    order = {"haar": 0, "haarp": 1, "dct": 2, "dctw": 3, "dctb": 4, "poly": 5, "ref": 6}
     return sorted(out, key=lambda r: (order[r[2]], r[3] or 0, r[4]))
 
 
@@ -245,16 +248,17 @@ def plot_full(full):
     """Success vs epoch on full LIBERO, overall and LIBERO-10; only models with all 400 episodes."""
     done = [r for r in full if len(r[5]) == 400]
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)
-    marker = {"plain cross-entropy": "o", "scale-weighted": "s", "soft labels + scale-weighted": "D", "√step-weighted": "^"}
+    marker = {"plain cross-entropy": "o", "scale-weighted": "s", "soft labels + scale-weighted": "D", "√step-weighted": "^", BW5: "v"}
     for ax, suites, title in ((axes[0], FULL_SUITES, "all four suites (400 episodes)"), (axes[1], ("libero_10",), "LIBERO-10 (100 episodes)")):
         def rate(m):
             ks = [k for k in m if k[0] in suites]
             return sum(m[k] for k in ks) / len(ks)
         for tok, color, lab in (("haar", COLOR["dwt_fixed"], "Haar DWT fixed (epochs 1–3 soft + weighted)"),
                                 ("haarp", "#7b4fc9", "Haar DWT fixed, plain from scratch"), ("dct", COLOR["dct_fixed"], "DCT, no BPE"),
-                                ("dctw", COLOR["dct_fixed"], None), ("poly", "#3c9d5d", "Orthogonal polynomials, √step-weighted")):
+                                ("dctw", COLOR["dct_fixed"], None), ("dctb", COLOR["dct_fixed"], None),
+                                ("poly", "#3c9d5d", "Orthogonal polynomials, √step-weighted")):
             main = sorted((r[3], rate(r[5])) for r in done if r[2] == tok and (tok != "haar" or r[3] < 4))
-            if main and tok != "dctw":
+            if main and tok not in ("dctw", "dctb"):
                 ax.plot(*zip(*main), "-", color=color, lw=2.2, label=lab if ax is axes[0] else None)
             for r in done:
                 if r[2] == tok:
@@ -758,7 +762,7 @@ def main() -> None:
                 c1 = pair(m, haar[ep])
             if tok in ("dct", "dctw", "poly") and ep in haarp:
                 c2 = pair(m, haarp[ep])
-            if tok in ("dctw", "poly") and ep in dctp:
+            if tok in ("dctw", "dctb", "poly") and ep in dctp:
                 c3 = pair(m, dctp[ep])
             pbody.append([esc(name), esc(loss), pair(m, ref) if ref else "–", c1, c2, c3])
         add("<h3>Paired tests on the same episodes (exact McNemar; episodes won only by the row model / only by the other)</h3>")
@@ -799,6 +803,15 @@ def main() -> None:
                          f"point, LIBERO-10 {vs(l10, {k: dctp[2][k] for k in l10})}"
                          + (f"; against plain DCT epoch 3 (same start, schedule and epoch, plain loss): {vs(a, dctp[3])}" if 3 in dctp else
                             "; plain DCT epoch 3, the matched comparison (same start and schedule, plain loss), is still training")
+                         + (f"; against π₀-FAST LIBERO: {vs(a, ref)}" if ref else "") + ".")
+        dctb = {r[3]: r[5] for r in done if r[2] == "dctb"}
+        if 4 in dctb:
+            a = dctb[4]
+            finds.append("<b>5-level stepped weights on DCT, one epoch from the plain epoch-3 checkpoint</b> (the codec's step range cut "
+                         "into 5 equal log-scale segments weighing 0.3, 0.6, 0.9, 1.2, 1.5, smallest step first; not normalized, no soft "
+                         f"labels): {vs(a, dctp[3])} against its starting point"
+                         + (f"; against plain DCT epoch 4 (same start, schedule and epoch, plain loss): {vs(a, dctp[4])}" if 4 in dctp else
+                            "; plain DCT epoch 4, the matched comparison, is queued")
                          + (f"; against π₀-FAST LIBERO: {vs(a, ref)}" if ref else "") + ".")
         if ("s0", 1) in dctw and 1 in dctp:
             finds.append(f"<b>√step weighting on DCT from scratch, epoch 1:</b> {vs(dctw[('s0', 1)], dctp[1])} against plain DCT epoch 1.")

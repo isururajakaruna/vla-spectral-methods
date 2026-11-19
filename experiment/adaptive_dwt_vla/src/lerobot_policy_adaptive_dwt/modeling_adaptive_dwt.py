@@ -76,10 +76,13 @@ def coef_targets(targets: torch.Tensor, codec: AdaptiveDWTCodec) -> tuple[torch.
     return torch.from_numpy(bins).to(targets.device), torch.from_numpy(steps).to(targets.device)
 
 
-def token_forward(policy, batch, codec=None, coef_weight: float = 0.0, soft_sigma: float = 0.0) -> dict:
+def token_forward(policy, batch, codec=None, coef_weight: float = 0.0, soft_sigma: float = 0.0,
+                  weight_levels: tuple = (), weight_bins: str = "log") -> dict:
     """``coef_weight`` = p > 0: weight each coefficient token's loss by its quantizer step to the power p (normalized
     to mean 1 over the coefficient tokens of the batch); p = 1 weights by the trajectory error a one-bin miss causes
-    under an orthonormal basis, p = 0.5 is a gentler version (True means 1). ``soft_sigma`` > 0: coefficient tokens
+    under an orthonormal basis, p = 0.5 is a gentler version (True means 1). ``weight_levels`` (window codecs): stepped
+    weights instead, not normalized: the codec's step range is cut into len(weight_levels) equal segments (``log`` or
+    ``linear`` in the step) and a coefficient token gets the level of its segment, smallest step first. ``soft_sigma`` > 0: coefficient tokens
     get a discretized-Gaussian target over neighbouring bins,
     q(b) ∝ exp(-((b - b*) step)² / 2σ²), σ in normalized action units. ``per_token`` is always the plain one-hot
     cross-entropy, so logged train/val losses stay comparable with the baseline."""
@@ -103,16 +106,32 @@ def token_forward(policy, batch, codec=None, coef_weight: float = 0.0, soft_sigm
     logits = pg.paligemma.lm_head(hidden)[:, :-1, :]  # position i predicts token i+1
     targets = act_tokens[:, 1:]
     mask = act_masks[:, 1:]
-    loss, per_tok = action_token_loss(logits, targets, mask, codec, coef_weight, soft_sigma)
+    loss, per_tok = action_token_loss(logits, targets, mask, codec, coef_weight, soft_sigma, weight_levels, weight_bins)
     return {"loss": loss, "per_token": per_tok.detach(), "pred": logits.detach().argmax(-1), "targets": targets, "mask": mask}
 
 
-def action_token_loss(logits, targets, mask, codec=None, coef_weight: float = 0.0, soft_sigma: float = 0.0):
+def level_edges(codec, n_levels: int, mode: str = "log") -> np.ndarray:
+    """Inner boundaries cutting the window codec's step range into ``n_levels`` equal segments."""
+    s = np.asarray(codec.step, dtype=np.float64)
+    edges = (np.geomspace if mode == "log" else np.linspace)(s.min(), s.max(), n_levels + 1)
+    return edges[1:-1]
+
+
+def action_token_loss(logits, targets, mask, codec=None, coef_weight: float = 0.0, soft_sigma: float = 0.0,
+                      weight_levels: tuple = (), weight_bins: str = "log"):
     """Returns (training loss, plain one-hot cross-entropy per position); see ``token_forward``."""
     flat = logits.float()
     per_tok = F.cross_entropy(flat.reshape(-1, flat.shape[-1]), targets.reshape(-1), reduction="none")
     per_tok = per_tok.reshape(targets.shape)
     train_tok = per_tok
+    if codec is not None and len(weight_levels):
+        bins, steps = coef_targets(targets, codec)
+        is_coef = (bins >= 0) & mask.bool()
+        edges = torch.as_tensor(level_edges(codec, len(weight_levels), weight_bins), dtype=steps.dtype, device=steps.device)
+        lv = torch.as_tensor(weight_levels, dtype=train_tok.dtype, device=train_tok.device)
+        w = torch.ones_like(train_tok)
+        w[is_coef] = lv[torch.bucketize(steps[is_coef], edges, right=True)]
+        return (train_tok * w * mask).sum() / mask.sum().clamp(min=1), per_tok
     if codec is not None and (coef_weight or soft_sigma > 0):
         bins, steps = coef_targets(targets, codec)
         is_coef = (bins >= 0) & mask.bool()

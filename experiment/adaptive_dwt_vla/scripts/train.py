@@ -58,6 +58,10 @@ def parse_args():
     ap.add_argument("--weight-power", type=float, default=None,
                     help="weight coefficient-token losses by quantizer step ** p (any variant); "
                          "default 1 for dwt_fixed_lw / dwt_fixed_slw, off otherwise")
+    ap.add_argument("--weight-levels", type=float, nargs="*", default=[],
+                    help="stepped coefficient-token weights, smallest-step segment first (window codecs), e.g. 0.3 0.6 0.9 1.2 1.5")
+    ap.add_argument("--weight-bins", choices=["log", "linear"], default="log",
+                    help="--weight-levels: cut the codec's step range into equal segments on a log or linear scale")
     ap.add_argument("--name", required=True)
     ap.add_argument("--tasks", type=int, nargs="+", default=[24])
     ap.add_argument("--horizon", type=int, default=10)
@@ -244,8 +248,13 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
         1.0 if args.variant in ("dwt_fixed_lw", "dwt_fixed_slw") else 0.0)
     if power and codec is None:
         raise ValueError("--weight-power needs a DWT/DCT codec")
+    if args.weight_levels and getattr(codec, "kind", None) != "window":
+        raise ValueError("--weight-levels needs a window codec (dct_fixed, poly_fixed, _s4h)")
+    if args.weight_levels and (power or args.variant == "dwt_fixed_slw"):
+        raise ValueError("--weight-levels replaces --weight-power and soft labels")
     loss_kw = dict(codec=codec, coef_weight=power,
-                   soft_sigma=args.soft_sigma if args.variant == "dwt_fixed_slw" else 0.0)
+                   soft_sigma=args.soft_sigma if args.variant == "dwt_fixed_slw" else 0.0,
+                   weight_levels=tuple(args.weight_levels), weight_bins=args.weight_bins)
     prefix_ids = tok.encode("Action: ", add_special_tokens=False)
     bar_id = tok.convert_tokens_to_ids("|")
     params = [p for p in policy.parameters() if p.requires_grad]
@@ -280,7 +289,8 @@ def _train(args, run: Path, status, metrics_path: Path) -> None:
         "empty_cameras": args.empty_cameras,
         "lora_rank": args.lora_rank, "lora_alpha": args.lora_alpha, "fixed_plan": fixed_plan, "oracle_gamma": gamma,
         "codec": codec.to_dict() if codec else None, "norm_stats": stats, "fallback_normalized": fallback.tolist(),
-        "loss": {"coef_weight": loss_kw["coef_weight"], "soft_sigma": loss_kw["soft_sigma"]},
+        "loss": {"coef_weight": loss_kw["coef_weight"], "soft_sigma": loss_kw["soft_sigma"],
+                 **({"weight_levels": list(args.weight_levels), "weight_bins": args.weight_bins} if args.weight_levels else {})},
         "action_tokenizer": cfg.action_tokenizer_name if args.variant == "fast_matched" else None,
         "base_checkpoint": "lerobot/pi0fast-base@308eb844dabdf46cd9dcd5138c1988b7a234f1d9",
         "dataset": f"{REPO}@{REVISION}",

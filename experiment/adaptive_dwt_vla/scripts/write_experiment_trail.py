@@ -552,6 +552,25 @@ def build_nodes():
           "Plain DCT epoch 3 decides whether that is the weighting or the extra epoch.") if pw is not None else
          "Compared against plain DCT epoch 3 once both are in.",
          short=(f"{pw:.0f}% @ epoch 3" if pw is not None else stw), link="training_report.html")
+    pb, stb, xb = one("full40_dct_fixed@full_e4_dct_fixed_bw5:step_58000", "full_e4_dct_fixed_bw5")
+    d4 = fpct(f_dct.format(58000))
+    node("FDCTB", "FDCTW", "DCT + 5-level stepped weights · 1 epoch from DCT epoch 3", stb,
+         "√step weighting gave nothing beyond the extra epoch. Plain DCT epoch 3 matches π₀-FAST LIBERO overall but still trails on "
+         "LIBERO-10. A coarser, fixed importance scale tests whether emphasizing the low-frequency DCT tokens in a few clear tiers, "
+         "with no averaging to 1, helps the final epoch.",
+         "Do fixed importance tiers on DCT tokens beat one more plain epoch from epoch 3?",
+         [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
+          ("Training", lora("DCT without BPE. The codec's quantizer-step range (0.007–0.179) is cut into 5 equal log-scale segments; "
+                            "coefficient tokens in them weigh 0.3, 0.6, 0.9, 1.2, 1.5 from the finest to the coarsest (24, 18, 8, 7 "
+                            "and 3 of the 60 coefficient tokens per chunk; DC of the rotation dims gets 1.5, the 6 finest bands of "
+                            "the position dims 0.3). Not normalized, structure and gripper tokens 1, no soft labels. Adapters + "
+                            "optimizer from plain DCT step 43,500, trained to 58,000 under the 58,000-step cosine, like plain DCT epoch 4")),
+          ("Compared with", "Plain DCT epoch 3 (its start) and epoch 4 (same start and schedule, plain loss); π₀-FAST LIBERO."),
+          ("Evaluation", "400 episodes.")],
+         (f"Same 400 episodes: {pb:.1f}%, against plain DCT epoch 3 {d3:.1f}%" + (f" and epoch 4 {d4:.1f}%" if d4 is not None else "")
+          + "." if pb is not None else "Queued after √step-weighted DCT from scratch." + xb),
+         "See the training report for the paired tests." if pb is not None else "Pending.",
+         short=(f"{pb:.0f}% @ epoch 4" if pb is not None else stb), link="training_report.html")
     ps0, sts0, xs0 = one("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_14500", "full_s0_dct_fixed_sqrtw")
     d1 = fpct(f_dct.format(14500))
     node("FDCTWS", "FDCTW", "DCT + √step weighting · from scratch, 1 epoch", sts0,
@@ -562,7 +581,7 @@ def build_nodes():
           ("Training", lora("DCT without BPE, " + sqrtw_setup + ". From scratch, one epoch under the 29,000-step cosine, like plain "
                             "DCT epoch 1")),
           ("Compared with", "Plain DCT epoch 1."), ("Evaluation", "400 episodes.")],
-         (f"Same 400 episodes: {ps0:.1f}% against plain DCT epoch 1 {d1:.1f}%." if ps0 is not None else "Queued after plain DCT epoch 3." + xs0),
+         (f"Same 400 episodes: {ps0:.1f}% against plain DCT epoch 1 {d1:.1f}%." if ps0 is not None else "Training after plain DCT epoch 3." + xs0),
          "See the training report for the paired test." if ps0 is not None else "Pending.",
          short=(f"{ps0:.0f}% @ epoch 1" if ps0 is not None else sts0), link="training_report.html")
     pp, stp, xp = one("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_14500", "full_s0_poly_fixed_sqrtw")
@@ -577,7 +596,7 @@ def build_nodes():
                             "epoch under the 29,000-step cosine")),
           ("Compared with", "√step-weighted DCT from scratch (same loss) and plain DCT at epoch 1."), ("Evaluation", "400 episodes.")],
          (f"Same 400 episodes: {pp:.1f}%" + (f" against √step-weighted DCT {ps0:.1f}%" if ps0 is not None else "")
-          + f" and plain DCT {d1:.1f}% at epoch 1." if pp is not None else "Queued after √step-weighted DCT from scratch." + xp),
+          + f" and plain DCT {d1:.1f}% at epoch 1." if pp is not None else "Queued after the 5-level stepped-weight DCT branch." + xp),
          "See the training report for the paired tests." if pp is not None else "Pending.",
          short=(f"{pp:.0f}% @ epoch 1" if pp is not None else stp), link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
