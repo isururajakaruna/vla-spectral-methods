@@ -545,8 +545,11 @@ def build_nodes():
           ("Evaluation", "400 episodes, the same as every full run.")],
          (f"Same 400 episodes: {pw:.1f}%, against plain DCT epoch 2 {d2:.1f}%" + (f" and epoch 3 {d3:.1f}%" if d3 is not None else "")
           + (f"; π₀-FAST LIBERO {f_ref:.1f}%" if f_ref is not None else "") + "." if pw is not None else "Queued." + xw),
-         "The gain over epoch 2 is almost all LIBERO-10 (66% → 80%, paired p = 0.02); overall it is level with π₀-FAST LIBERO (p = 0.53). "
-         "Plain DCT epoch 3 decides whether that is the weighting or the extra epoch." if pw is not None else
+         ("The gain over epoch 2 was the extra epoch, not the weighting: plain DCT epoch 3 gained the same, LIBERO-10 included "
+          "(66% → 79% plain vs 80% weighted), and the two tie (paired p = 0.68). Both are level with π₀-FAST LIBERO."
+          if d3 is not None else
+          "The gain over epoch 2 is almost all LIBERO-10 (66% → 80%, paired p = 0.02); overall it is level with π₀-FAST LIBERO (p = 0.53). "
+          "Plain DCT epoch 3 decides whether that is the weighting or the extra epoch.") if pw is not None else
          "Compared against plain DCT epoch 3 once both are in.",
          short=(f"{pw:.0f}% @ epoch 3" if pw is not None else stw), link="training_report.html")
     ps0, sts0, xs0 = one("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_14500", "full_s0_dct_fixed_sqrtw")
