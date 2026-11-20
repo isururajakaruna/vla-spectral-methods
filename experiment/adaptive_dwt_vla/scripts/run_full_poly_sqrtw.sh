@@ -2,8 +2,8 @@
 # Orthogonal-polynomial tokens (poly_fixed: Legendre basis orthonormalized on the 10 sample points, no BPE, same
 # quantizer, grammar and 64-token chunks as DCT without BPE) with √step weighting, trained from scratch on full LIBERO
 # for one epoch under the same 29,000-step cosine as DCT epoch 1 (ckpt/latest keeps the optimizer, so a second epoch
-# can resume), then the 400-episode evaluation. Hands over to scripts/run_full_dct_control.sh (skips finished work,
-# trains plain DCT epoch 4).
+# can resume), then the 400-episode evaluation. Hands over to scripts/run_full_poly_sqrtw_e2.sh (its second epoch),
+# which hands over to scripts/run_full_dct_control.sh (skips finished work, trains plain DCT epoch 4).
 # Usage: scripts/run_full_poly_sqrtw.sh
 set -u
 cd "$(dirname "$0")/.."
@@ -45,5 +45,5 @@ if [ -d "runs/$ck" ]; then
   [ -d "weights/${name}_step_14500" ] || cp -r "runs/$ck" "weights/${name}_step_14500"
   reports
 fi
-echo "[$(date)] finished $name; continuing the DCT control" | tee -a "$LOG"
-exec bash scripts/run_full_dct_control.sh
+echo "[$(date)] finished $name epoch 1; next its epoch 2" | tee -a "$LOG"
+exec bash scripts/run_full_poly_sqrtw_e2.sh

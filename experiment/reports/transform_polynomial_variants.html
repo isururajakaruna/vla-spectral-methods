@@ -1,0 +1,75 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'><title>Polynomial and spline bases</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:1180px;margin:2rem auto;padding:0 1rem;
+color:#1d2433;line-height:1.5}h1{font-size:1.6rem}h2{margin-top:2.2rem;border-bottom:1px solid #dde3ec;padding-bottom:.3rem}
+table{border-collapse:collapse;margin:1rem 0;font-size:.88rem}th,td{border:1px solid #dde3ec;padding:.3rem .55rem;text-align:right}
+th{background:#f3f6fa}td:first-child,th:first-child{text-align:left}img{max-width:100%}.sub{color:#5b6475}
+.hl td{background:#fff7e0}code{background:#f3f6fa;padding:0 .25rem;border-radius:3px}</style></head><body>
+<h1>Polynomial and spline bases: which one moves the fewest tokens?</h1>
+<p class='sub'>Generated 2026-11-20 23:50 by <code>scripts/transform_polynomial_variants.py</code>. Synthetic shapes only; companion to <a href='transform_shift_analysis.html'>token shift</a>, <a href='transform_fingerprint_analysis.html'>fingerprints</a> and <a href='transform_topk_shift_analysis.html'>top-3% shift</a>.</p>
+<p><b>Result at the training horizon (10 samples).</b> Fewest tokens moved by an edit: Gram polynomials (orthonormal, poly_fixed) (51%). The trained Gram polynomials move 51% and DCT-II 59%. Subtle edits under smooth jitter are identified 54% (Gram) and 57% (DCT) of the time.</p>
+<h2>Bases</h2>
+<table><thead><tr><th>basis</th><th>definition</th></tr></thead><tbody>
+<tr><td>Gram polynomials (orthonormal, poly_fixed)</td><td>Legendre QR-orthonormalized on the samples; the trained poly codec</td></tr>
+<tr><td>Legendre (raw)</td><td>P_k(u), u uniform in [-1, 1]</td></tr>
+<tr><td>Chebyshev (raw)</td><td>T_k(u) on the uniform samples (on Chebyshev nodes it would be the DCT-II)</td></tr>
+<tr><td>Hermite (raw)</td><td>H_k(2u), physicists&#x27; Hermite</td></tr>
+<tr><td>monomials t^k (raw)</td><td>u^k</td></tr>
+<tr><td>Bernstein / Bézier (raw)</td><td>C(H-1,k) x^k (1-x)^(H-1-k), x uniform in [0, 1]</td></tr>
+<tr><td>cubic B-spline (raw)</td><td>clamped uniform knots, H basis functions, local support of 4 knot spans</td></tr>
+<tr><td>cubic B-spline (orthonormalized)</td><td>S = B (B^T B)^-1/2, still nearly local</td></tr>
+<tr><td>linear B-spline (hat functions)</td><td>piecewise linear; with H hats on H samples it is the identity, a sanity row</td></tr>
+<tr><td>DCT-II, Haar, sym4→Haar</td><td>references; sym4→Haar is the wavelet codec the Haar training runs use</td></tr></tbody></table>
+<p>Why the raw polynomial bases differ from each other: they span the same space, so a trajectory has the same reconstruction in each, but the coefficients are different linear mixtures and the quantizer rounds each coefficient on its own. Equal-accuracy steps keep the rounding error per coefficient identical, so the comparison is fair. Bases with condition number above 1e+08 are not usable for tokenization at that size and are skipped.</p>
+<h2>10 samples (top 3% = 1 coefficient)</h2>
+<table><thead><tr><th>basis</th><th>group</th><th>condition number</th><th>tokens moved</th><th>nonzero tokens</th><th>overlap between edits</th><th>peak jump (bins)</th><th>top-3 share</th><th>top-3% shift (bins)</th><th>top-3% relative</th><th>top-3% set change</th><th>subtle id, Hamming, smooth jitter</th><th>subtle id, Hamming, white jitter</th><th>subtle id, |bin| sum, smooth jitter</th></tr></thead><tbody>
+<tr><td>Gram polynomials (orthonormal, poly_fixed)</td><td>polynomial</td><td>1</td><td>51%</td><td>84%</td><td>33%</td><td>26</td><td>82%</td><td>12.0</td><td>15%</td><td>15%</td><td>54%</td><td>78%</td><td>93%</td></tr>
+<tr><td>Chebyshev (raw)</td><td>polynomial</td><td>13</td><td>54%</td><td>88%</td><td>36%</td><td>27</td><td>82%</td><td>12.8</td><td>16%</td><td>15%</td><td>52%</td><td>47%</td><td>92%</td></tr>
+<tr><td>Legendre (raw)</td><td>polynomial</td><td>22</td><td>55%</td><td>91%</td><td>36%</td><td>31</td><td>81%</td><td>14.5</td><td>16%</td><td>16%</td><td>49%</td><td>47%</td><td>89%</td></tr>
+<tr><td>Hermite (raw)</td><td>polynomial</td><td>819</td><td>58%</td><td>95%</td><td>38%</td><td>199</td><td>81%</td><td>101.3</td><td>41%</td><td>26%</td><td>25%</td><td>32%</td><td>53%</td></tr>
+<tr><td><b>DCT-II</b></td><td>reference</td><td>1</td><td>59%</td><td>87%</td><td>41%</td><td>26</td><td>83%</td><td>12.6</td><td>15%</td><td>15%</td><td>57%</td><td>75%</td><td>94%</td></tr>
+<tr><td>monomials t^k (raw)</td><td>polynomial</td><td>3660</td><td>60%</td><td>97%</td><td>38%</td><td>945</td><td>81%</td><td>480.2</td><td>43%</td><td>29%</td><td>17%</td><td>25%</td><td>49%</td></tr>
+<tr><td><b>sym4→Haar (training codec)</b></td><td>reference</td><td>2</td><td>65%</td><td>86%</td><td>58%</td><td>23</td><td>68%</td><td>13.3</td><td>19%</td><td>25%</td><td>63%</td><td>90%</td><td>92%</td></tr>
+<tr><td>linear B-spline (hat functions)</td><td>spline</td><td>1</td><td>91%</td><td>99%</td><td>82%</td><td>18</td><td>57%</td><td>8.2</td><td>17%</td><td>54%</td><td>43%</td><td>93%</td><td>87%</td></tr>
+<tr><td>cubic B-spline (raw)</td><td>spline</td><td>7</td><td>92%</td><td>99%</td><td>85%</td><td>19</td><td>60%</td><td>9.1</td><td>19%</td><td>44%</td><td>54%</td><td>65%</td><td>90%</td></tr>
+<tr><td>cubic B-spline (orthonormalized)</td><td>spline</td><td>1</td><td>92%</td><td>99%</td><td>85%</td><td>18</td><td>58%</td><td>9.2</td><td>18%</td><td>46%</td><td>44%</td><td>92%</td><td>87%</td></tr>
+<tr><td>Bernstein / Bézier (raw)</td><td>polynomial</td><td>932</td><td>94%</td><td>99%</td><td>88%</td><td>174</td><td>65%</td><td>117.3</td><td>64%</td><td>36%</td><td>19%</td><td>51%</td><td>46%</td></tr></tbody></table>
+<h2>16 samples (top 3% = 1 coefficient)</h2>
+<table><thead><tr><th>basis</th><th>group</th><th>condition number</th><th>tokens moved</th><th>nonzero tokens</th><th>overlap between edits</th><th>peak jump (bins)</th><th>top-3 share</th><th>top-3% shift (bins)</th><th>top-3% relative</th><th>top-3% set change</th><th>subtle id, Hamming, smooth jitter</th><th>subtle id, Hamming, white jitter</th><th>subtle id, |bin| sum, smooth jitter</th></tr></thead><tbody>
+<tr><td>Gram polynomials (orthonormal, poly_fixed)</td><td>polynomial</td><td>1</td><td>38%</td><td>61%</td><td>29%</td><td>32</td><td>80%</td><td>15.0</td><td>15%</td><td>15%</td><td>54%</td><td>79%</td><td>94%</td></tr>
+<tr><td>Chebyshev (raw)</td><td>polynomial</td><td>386</td><td>42%</td><td>65%</td><td>31%</td><td>38</td><td>79%</td><td>18.9</td><td>19%</td><td>19%</td><td>21%</td><td>18%</td><td>35%</td></tr>
+<tr><td>Legendre (raw)</td><td>polynomial</td><td>596</td><td>44%</td><td>69%</td><td>32%</td><td>41</td><td>79%</td><td>19.2</td><td>17%</td><td>18%</td><td>23%</td><td>14%</td><td>45%</td></tr>
+<tr><td><b>DCT-II</b></td><td>reference</td><td>1</td><td>48%</td><td>72%</td><td>37%</td><td>33</td><td>81%</td><td>15.9</td><td>15%</td><td>14%</td><td>58%</td><td>76%</td><td>95%</td></tr>
+<tr><td><b>sym4→Haar (training codec)</b></td><td>reference</td><td>2</td><td>53%</td><td>74%</td><td>54%</td><td>27</td><td>65%</td><td>15.0</td><td>18%</td><td>27%</td><td>62%</td><td>93%</td><td>93%</td></tr>
+<tr><td>Hermite (raw)</td><td>polynomial</td><td>8653606</td><td>57%</td><td>94%</td><td>35%</td><td>145874</td><td>77%</td><td>100906.1</td><td>6714%</td><td>16%</td><td>10%</td><td>10%</td><td>14%</td></tr>
+<tr><td>monomials t^k (raw)</td><td>polynomial</td><td>2536616</td><td>57%</td><td>96%</td><td>35%</td><td>39524</td><td>76%</td><td>18910.1</td><td>525%</td><td>27%</td><td>15%</td><td>22%</td><td>17%</td></tr>
+<tr><td><b>Haar</b></td><td>reference</td><td>1</td><td>79%</td><td>97%</td><td>62%</td><td>27</td><td>63%</td><td>15.9</td><td>18%</td><td>25%</td><td>65%</td><td>90%</td><td>94%</td></tr>
+<tr><td>cubic B-spline (raw)</td><td>spline</td><td>14</td><td>89%</td><td>99%</td><td>80%</td><td>17</td><td>45%</td><td>8.8</td><td>19%</td><td>41%</td><td>57%</td><td>63%</td><td>90%</td></tr>
+<tr><td>linear B-spline (hat functions)</td><td>spline</td><td>1</td><td>89%</td><td>99%</td><td>80%</td><td>18</td><td>42%</td><td>8.0</td><td>16%</td><td>61%</td><td>48%</td><td>97%</td><td>87%</td></tr>
+<tr><td>cubic B-spline (orthonormalized)</td><td>spline</td><td>1</td><td>90%</td><td>99%</td><td>81%</td><td>19</td><td>43%</td><td>8.6</td><td>17%</td><td>58%</td><td>51%</td><td>96%</td><td>88%</td></tr>
+<tr><td>Bernstein / Bézier (raw)</td><td>polynomial</td><td>305451</td><td>93%</td><td>99%</td><td>87%</td><td>3546</td><td>49%</td><td>2288.8</td><td>1176%</td><td>36%</td><td>19%</td><td>54%</td><td>20%</td></tr></tbody></table>
+<h2>32 samples (top 3% = 1 coefficient)</h2>
+<p class='sub'>Skipped, too ill-conditioned: Bernstein / Bézier (raw), Hermite (raw), monomials t^k (raw).</p>
+<table><thead><tr><th>basis</th><th>group</th><th>condition number</th><th>tokens moved</th><th>nonzero tokens</th><th>overlap between edits</th><th>peak jump (bins)</th><th>top-3 share</th><th>top-3% shift (bins)</th><th>top-3% relative</th><th>top-3% set change</th><th>subtle id, Hamming, smooth jitter</th><th>subtle id, Hamming, white jitter</th><th>subtle id, |bin| sum, smooth jitter</th></tr></thead><tbody>
+<tr><td>Gram polynomials (orthonormal, poly_fixed)</td><td>polynomial</td><td>1</td><td>22%</td><td>33%</td><td>28%</td><td>46</td><td>80%</td><td>21.1</td><td>15%</td><td>15%</td><td>53%</td><td>81%</td><td>94%</td></tr>
+<tr><td>Chebyshev (raw)</td><td>polynomial</td><td>9095344</td><td>29%</td><td>40%</td><td>28%</td><td>79</td><td>77%</td><td>44.9</td><td>27%</td><td>21%</td><td>10%</td><td>10%</td><td>10%</td></tr>
+<tr><td>Legendre (raw)</td><td>polynomial</td><td>14789122</td><td>30%</td><td>41%</td><td>28%</td><td>69</td><td>77%</td><td>34.5</td><td>21%</td><td>20%</td><td>10%</td><td>10%</td><td>10%</td></tr>
+<tr><td><b>DCT-II</b></td><td>reference</td><td>1</td><td>31%</td><td>51%</td><td>35%</td><td>47</td><td>80%</td><td>22.5</td><td>15%</td><td>14%</td><td>58%</td><td>79%</td><td>96%</td></tr>
+<tr><td><b>sym4→Haar (training codec)</b></td><td>reference</td><td>2</td><td>41%</td><td>54%</td><td>56%</td><td>38</td><td>59%</td><td>21.2</td><td>18%</td><td>27%</td><td>64%</td><td>96%</td><td>94%</td></tr>
+<tr><td><b>Haar</b></td><td>reference</td><td>1</td><td>70%</td><td>95%</td><td>52%</td><td>38</td><td>57%</td><td>22.4</td><td>18%</td><td>25%</td><td>69%</td><td>93%</td><td>95%</td></tr>
+<tr><td>cubic B-spline (raw)</td><td>spline</td><td>147</td><td>86%</td><td>99%</td><td>75%</td><td>17</td><td>27%</td><td>8.9</td><td>20%</td><td>38%</td><td>60%</td><td>73%</td><td>87%</td></tr>
+<tr><td>cubic B-spline (orthonormalized)</td><td>spline</td><td>1</td><td>88%</td><td>99%</td><td>78%</td><td>19</td><td>25%</td><td>8.4</td><td>16%</td><td>69%</td><td>56%</td><td>99%</td><td>89%</td></tr>
+<tr><td>linear B-spline (hat functions)</td><td>spline</td><td>1</td><td>89%</td><td>99%</td><td>79%</td><td>19</td><td>24%</td><td>7.7</td><td>15%</td><td>68%</td><td>53%</td><td>99%</td><td>89%</td></tr></tbody></table>
+<h2>Tokens moved per edit, 10 samples</h2>
+<table><thead><tr><th>basis</th><th>slope up</th><th>slope down</th><th>offset</th><th>growing amplitude</th><th>decaying amplitude</th><th>added curvature</th><th>local bump</th><th>time shift (delay 6%)</th><th>frequency drift (time warp)</th></tr></thead><tbody>
+<tr><td>Gram polynomials (orthonormal, poly_fixed)</td><td>10%</td><td>10%</td><td>10%</td><td>77%</td><td>75%</td><td>12%</td><td>96%</td><td>82%</td><td>86%</td></tr>
+<tr><td>Chebyshev (raw)</td><td>10%</td><td>10%</td><td>10%</td><td>81%</td><td>80%</td><td>20%</td><td>97%</td><td>85%</td><td>90%</td></tr>
+<tr><td>Legendre (raw)</td><td>10%</td><td>10%</td><td>10%</td><td>85%</td><td>84%</td><td>20%</td><td>98%</td><td>89%</td><td>93%</td></tr>
+<tr><td>Hermite (raw)</td><td>10%</td><td>10%</td><td>10%</td><td>93%</td><td>92%</td><td>20%</td><td>100%</td><td>94%</td><td>97%</td></tr>
+<tr><td>DCT-II</td><td>34%</td><td>34%</td><td>10%</td><td>80%</td><td>77%</td><td>36%</td><td>96%</td><td>81%</td><td>85%</td></tr>
+<tr><td>monomials t^k (raw)</td><td>10%</td><td>10%</td><td>10%</td><td>97%</td><td>97%</td><td>20%</td><td>98%</td><td>97%</td><td>98%</td></tr>
+<tr><td>sym4→Haar (training codec)</td><td>63%</td><td>63%</td><td>12%</td><td>77%</td><td>74%</td><td>71%</td><td>59%</td><td>80%</td><td>82%</td></tr>
+<tr><td>linear B-spline (hat functions)</td><td>100%</td><td>100%</td><td>100%</td><td>95%</td><td>94%</td><td>100%</td><td>34%</td><td>97%</td><td>95%</td></tr>
+<tr><td>cubic B-spline (raw)</td><td>100%</td><td>100%</td><td>100%</td><td>92%</td><td>91%</td><td>91%</td><td>65%</td><td>95%</td><td>92%</td></tr>
+<tr><td>cubic B-spline (orthonormalized)</td><td>100%</td><td>100%</td><td>100%</td><td>95%</td><td>94%</td><td>100%</td><td>51%</td><td>96%</td><td>94%</td></tr>
+<tr><td>Bernstein / Bézier (raw)</td><td>91%</td><td>93%</td><td>100%</td><td>95%</td><td>95%</td><td>97%</td><td>81%</td><td>97%</td><td>96%</td></tr></tbody></table>
+<h2>Reproduce</h2><pre>cd smooth-operator/experiment/adaptive_dwt_vla/scripts
+~/miniconda3/envs/smooth-operator-vla/bin/python transform_polynomial_variants.py</pre></body></html>

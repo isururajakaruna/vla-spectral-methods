@@ -599,20 +599,31 @@ def build_nodes():
          short=(f"{ps2:.0f}% @ epoch 2" if ps2 is not None else f"{ps0:.0f}% @ epoch 1" if ps0 is not None else sts0),
          link="training_report.html")
     pp, stp, xp = one("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_14500", "full_s0_poly_fixed_sqrtw")
-    node("FPOLY", "FDCTWS", "Orthogonal polynomials + √step weighting · from scratch, 1 epoch", stp,
+    pp2 = fpct("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_29000")
+    p2st = run_status("full_s0_poly_fixed_sqrtw")[1] or {}
+    p2_running = pp is not None and pp2 is None and p2st.get("step", 0) > 14500
+    ps2w = fpct("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_29000")
+    node("FPOLY", "FDCTWS", "Orthogonal polynomials + √step weighting · from scratch, 2 epochs",
+         "done" if pp2 is not None else "running" if p2_running else stp if pp is None else "planned",
          "In the synthetic studies orthogonal polynomials ranked first of 18 transforms: a smooth edit of a motion moves the fewest tokens "
          "(22% vs 30% for DCT and 69% for Haar), and different edits land on different tokens. Offline on LIBERO chunks the polynomial "
          "codec is as accurate as DCT at the same 64 tokens (MSE 1.64e-4 vs 1.65e-4).",
          "Does the best basis in the synthetic studies beat DCT as a VLA action tokenizer?",
          [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
           ("Training", lora("poly_fixed: Legendre polynomials orthonormalized on the 10 sample points, grouped by degree (0, 1, 2–3, 4–9) "
-                            "like the DCT bands, same quantizer, vocabulary and grammar, no BPE; " + sqrtw_setup + ". From scratch, one "
-                            "epoch under the 29,000-step cosine")),
-          ("Compared with", "√step-weighted DCT from scratch (same loss) and plain DCT at epoch 1."), ("Evaluation", "400 episodes.")],
-         (f"Same 400 episodes: {pp:.1f}%" + (f" against √step-weighted DCT {ps0:.1f}%" if ps0 is not None else "")
-          + f" and plain DCT {d1:.1f}% at epoch 1." if pp is not None else "Queued after epoch 2 of √step-weighted DCT." + xp),
+                            "like the DCT bands, same quantizer, vocabulary and grammar, no BPE; " + sqrtw_setup + ". From scratch with "
+                            "DCT's learning-rate history: epoch 1 under the 29,000-step cosine, epoch 2 resumed under 43,500 steps")),
+          ("Compared with", "√step-weighted DCT from scratch (same loss) and plain DCT at the same epoch."),
+          ("Evaluation", "400 episodes after each epoch.")],
+         (f"Same 400 episodes: epoch 1 {pp:.1f}%" + (f" against √step-weighted DCT {ps0:.1f}%" if ps0 is not None else "")
+          + f" and plain DCT {d1:.1f}%"
+          + (f"; epoch 2 {pp2:.1f}%" + (f" against √step-weighted DCT {ps2w:.1f}%" if ps2w is not None else "")
+             + f" and plain DCT {fpct(f_dct.format(29000)):.1f}%" if pp2 is not None else
+             f"; epoch 2 training, step {p2st.get('step', 0)} / 29000" if p2_running else "; epoch 2 queued")
+          + "." if pp is not None else "Queued after epoch 2 of √step-weighted DCT." + xp),
          "See the training report for the paired tests." if pp is not None else "Pending.",
-         short=(f"{pp:.0f}% @ epoch 1" if pp is not None else stp), link="training_report.html")
+         short=(f"{pp2:.0f}% @ epoch 2" if pp2 is not None else f"{pp:.0f}% @ epoch 1" if pp is not None else stp),
+         link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
          "those advantages should show up in a policy.",
