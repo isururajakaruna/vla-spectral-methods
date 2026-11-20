@@ -32,8 +32,6 @@
     </div>
 
     <svg id="chart" viewBox="0 0 1280 720"></svg>
-    <div class="foot-note">Closed-loop success out of 60 at 250 / 500 / 1k / 1.5k / 2k steps. p-values: paired McNemar tests on the same
-      episodes. FAST here learns BPE tokens under the same LoRA recipe; a fully fine-tuned π₀-FAST reaches 17/20 on this task.</div>
   </section>
 </div>
 
@@ -52,7 +50,7 @@ lineChart(document.getElementById('chart'), {
     { name: 'Haar DWT (ours)', color: C.haar, k: [0, 14, 47, 51, 53], n: 60, width: 4 },
   ],
 });
-startDeck({ index: 12, total: 15, prev: '11_wavelet_family.html', next: '13_token_format.html' });
+startDeck({ index: 12, total: 17, prev: '11_wavelet_family.html', next: '13_token_format.html' });
 </script>
 </body>
 </html>

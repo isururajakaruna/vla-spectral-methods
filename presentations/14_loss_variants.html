@@ -32,8 +32,6 @@
     </div>
 
     <svg id="chart" viewBox="0 0 1280 720"></svg>
-    <div class="foot-note">Plain CE and soft labels + weighting: 3 seeds × 20 episodes per point. Weighting alone: seed 0 only (out of 20),
-      shown without a band. p-value: paired McNemar test on the same episodes.</div>
   </section>
 </div>
 
@@ -46,12 +44,12 @@ lineChart(document.getElementById('chart'), {
   xs: [250, 500, 1000, 1500, 2000], xMin: 0,
   xLabel: 'training steps', yLabel: 'success rate',
   series: [
-    { name: 'weighting only', color: '#FA7B17', k: [0, 17, 10, 17, 17], n: 20, ci: false, width: 2.4, dy: 26 },
-    { name: 'soft + weighting', color: '#A142F4', k: [3, 17, 37, 43, 52], n: 60, dy: 12 },
+    { name: 'weighting only', color: C.weighted, k: [0, 17, 10, 17, 17], n: 20, ci: false, width: 2.4, dy: 26 },
+    { name: 'soft + weighting', color: C.soft, k: [3, 17, 37, 43, 52], n: 60, dy: 12 },
     { name: 'plain CE', color: C.haar, k: [0, 14, 47, 51, 53], n: 60, dy: -8 },
   ],
 });
-startDeck({ index: 14, total: 15, prev: '13_token_format.html', next: '15_scaling_and_limits.html' });
+startDeck({ index: 14, total: 17, prev: '13_token_format.html', next: '15_scaling_and_limits.html' });
 </script>
 </body>
 </html>

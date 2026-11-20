@@ -23,9 +23,6 @@
     </div>
 
     <svg id="chart" viewBox="0 0 1280 720"></svg>
-    <div class="foot-note">Left: 10 tasks × 10 episodes per suite. The grey bar is lerobot/pi0fast-libero, fully fine-tuned on all 40 tasks
-      (not a matched comparison; only its Spatial suite has been evaluated). Right: the same checkpoints solve 10–20/20 on their training task;
-      all zero-shot successes come from two objects.</div>
   </section>
 </div>
 
@@ -37,25 +34,25 @@ const svg = document.getElementById('chart');
 barChart(svg, {
   x: 160, y: 236, w: 520, h: 310, yLabel: 'success rate',
   bars: [
-    { label: 'Spatial', sub: 'ours', v: .57, text: '57%', color: C.haar },
+    { label: 'Spatial', sub: 'ours', v: .57, text: '57%', color: C.soft },
     { label: 'Spatial', sub: 'π₀-FAST ref', v: .90, text: '90%', color: C.ref },
-    { label: 'Object', sub: 'ours', v: .70, text: '70%', color: C.haar },
-    { label: 'Goal', sub: 'ours', v: .63, text: '63%', color: C.haar },
-    { label: 'Long', sub: 'ours', v: .22, text: '22%', color: C.haar },
+    { label: 'Object', sub: 'ours', v: .70, text: '70%', color: C.soft },
+    { label: 'Goal', sub: 'ours', v: .63, text: '63%', color: C.soft },
+    { label: 'Long', sub: 'ours', v: .22, text: '22%', color: C.soft },
   ],
 });
 barChart(svg, {
   x: 820, y: 236, w: 350, h: 310, yMax: .2, yTicks: [0, .1, .2], t0: 0.9,
   bars: [
     { label: 'Haar', v: 6 / 45, text: '6', color: C.haar },
-    { label: 'weighted', v: 7 / 45, text: '7', color: '#FA7B17' },
-    { label: 'soft+w', v: 6 / 45, text: '6', color: '#A142F4' },
-    { label: 'sym4', v: 4 / 45, text: '4', color: '#12B5CB' },
+    { label: 'weighted', v: 7 / 45, text: '7', color: C.weighted },
+    { label: 'soft+w', v: 6 / 45, text: '6', color: C.soft },
+    { label: 'sym4', v: 4 / 45, text: '4', color: C.sym4 },
     { label: 'DCT', v: 2 / 45, text: '2', color: C.dct },
     { label: 'adaptive', v: 0, text: '0', color: C.adapt },
   ],
 });
-startDeck({ index: 15, total: 15, prev: '14_loss_variants.html', next: null });
+startDeck({ index: 15, total: 17, prev: '14_loss_variants.html', next: '16_loss_curves.html' });
 </script>
 </body>
 </html>

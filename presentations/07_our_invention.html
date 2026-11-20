@@ -49,8 +49,6 @@ h1{margin:0;font-size:36px;font-weight:500;line-height:1.15}
       <span>✓</span><span><b>Haar DWT: 53/60</b> vs FAST 17/60</span></div>
     <div class="result" style="left:460px;width:740px;background:#F1F3F4;color:#3C4043">
       <span>≈</span><span><b>Soft labels + weighting: 52/60</b> vs 53/60 with plain cross-entropy, no significant difference</span></div>
-    <div class="foot-note">Closed-loop success on libero_object #0 after 2000 steps, 3 seeds × 20 episodes. Signal and weights are illustrative
-      within the report’s measured ranges; the soft-label targets use the real σ = 0.007 and step sizes.</div>
   </section>
 </div>
 
@@ -61,7 +59,7 @@ h1{margin:0;font-size:36px;font-weight:500;line-height:1.15}
 const svg = document.getElementById('anim');
 const anims = [buildWavelet(svg), buildWeighting(svg), buildSoftLabels(svg)];
 startDeck({
-  index: 7, total: 15,
+  index: 7, total: 17,
   prev: '06_time_vs_frequency.html',
   next: '08_formulation.html',
   frame: t => anims.forEach(a => a(t)),

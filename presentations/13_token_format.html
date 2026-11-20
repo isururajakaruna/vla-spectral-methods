@@ -23,8 +23,6 @@
     </div>
 
     <svg id="chart" viewBox="0 0 1280 720"></svg>
-    <div class="foot-note">Closed-loop success on LIBERO-Object task 0; solid bars pool 3 seeds × 20 episodes. Haar beats DCT on the same episodes
-      (p = 0.041 at 2k steps, p = 0.002 at 1k). Latency is mean wall time to generate one 10-step chunk.</div>
   </section>
 </div>
 
@@ -40,7 +38,7 @@ barChart(svg, {
     { label: 'Haar + BPE', sub: '1 seed', v: 9 / 20, text: '9/20', color: C.haar, faded: true },
     { label: 'DCT', sub: 'no BPE', v: 43 / 60, text: '43/60', color: C.dct },
     { label: 'Haar DWT', sub: 'ours', v: 53 / 60, text: '53/60', color: C.haar },
-    { label: 'sym4→Haar', sub: '1 seed', v: 15 / 20, text: '15/20', color: '#12B5CB', faded: true },
+    { label: 'sym4→Haar', sub: '1 seed', v: 15 / 20, text: '15/20', color: C.sym4, faded: true },
   ],
   groups: [{ from: 0, to: 1, label: 'with BPE' }, { from: 2, to: 4, label: 'without BPE' }],
 });
@@ -53,7 +51,7 @@ barChart(svg, {
     { label: 'Haar', sub: '69.1 tokens', v: 1134, text: '1134', color: C.haar },
   ],
 });
-startDeck({ index: 13, total: 15, prev: '12_learning_curves.html', next: '14_loss_variants.html' });
+startDeck({ index: 13, total: 17, prev: '12_learning_curves.html', next: '14_loss_variants.html' });
 </script>
 </body>
 </html>

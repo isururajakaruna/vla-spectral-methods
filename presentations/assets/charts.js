@@ -1,5 +1,5 @@
 // Small animated SVG charts for the experiment slides (needs el() from arm.js).
-const C = { fast: '#EA4335', dct: '#F9AB00', haar: '#4285F4', adapt: '#34A853', ref: '#9AA0A6', ink: '#202124' };
+const C = { fast: '#EA4335', dct: '#F9AB00', haar: '#4285F4', adapt: '#34A853', weighted: '#FA7B17', soft: '#A142F4', sym4: '#12B5CB', ref: '#9AA0A6', ink: '#202124' };
 
 function wilson(k, n, z = 1.96) {
   const p = k / n, d = 1 + z * z / n, c = p + z * z / (2 * n);
