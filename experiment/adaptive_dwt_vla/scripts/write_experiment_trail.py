@@ -568,22 +568,36 @@ def build_nodes():
           ("Compared with", "Plain DCT epoch 3 (its start) and epoch 4 (same start and schedule, plain loss); π₀-FAST LIBERO."),
           ("Evaluation", "400 episodes.")],
          (f"Same 400 episodes: {pb:.1f}%, against plain DCT epoch 3 {d3:.1f}%" + (f" and epoch 4 {d4:.1f}%" if d4 is not None else "")
-          + "." if pb is not None else "Queued after √step-weighted DCT from scratch." + xb),
-         "See the training report for the paired tests." if pb is not None else "Pending.",
+          + (f"; π₀-FAST LIBERO {f_ref:.1f}%" if f_ref is not None else "") + "." if pb is not None else
+          "Queued after √step-weighted DCT from scratch." + xb),
+         ("Ties its starting point (paired p = 1.0) and π₀-FAST LIBERO (p = 1.0). LIBERO-10 reached 83%, the best of any of our models "
+          "(plain DCT epoch 3: 79%, π₀-FAST LIBERO: 87%), but the +4 points are not significant (p = 0.56). "
+          + ("Plain DCT epoch 4 (same start and schedule, plain loss) separates the weighting from the extra epoch."
+             if d4 is None else "See the training report for the paired test against plain DCT epoch 4."))
+         if pb is not None else "Pending.",
          short=(f"{pb:.0f}% @ epoch 4" if pb is not None else stb), link="training_report.html")
     ps0, sts0, xs0 = one("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_14500", "full_s0_dct_fixed_sqrtw")
     d1 = fpct(f_dct.format(14500))
-    node("FDCTWS", "FDCTW", "DCT + √step weighting · from scratch, 1 epoch", sts0,
+    ps2 = fpct("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_29000")
+    s2st = run_status("full_s0_dct_fixed_sqrtw")[1] or {}
+    e2_running = ps0 is not None and ps2 is None and s2st.get("step", 0) > 14500
+    node("FDCTWS", "FDCTW", "DCT + √step weighting · from scratch, 2 epochs",
+         "done" if ps2 is not None else "running" if ps0 is None or e2_running else "planned",
          "The branch from epoch 2 only shows the weighting as a late fine-tune. On Haar the modified loss hurt most early in training, so "
-         "train the same weighting from scratch and compare with plain DCT epoch 1.",
+         "train the same weighting from scratch and compare with plain DCT epoch by epoch. Epoch 1 came out slightly ahead of plain DCT "
+         "(not significant, LIBERO-10 +10 points), so a second epoch was added.",
          "Does √step weighting help or hurt DCT when used from the start?",
          [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
-          ("Training", lora("DCT without BPE, " + sqrtw_setup + ". From scratch, one epoch under the 29,000-step cosine, like plain "
-                            "DCT epoch 1")),
-          ("Compared with", "Plain DCT epoch 1."), ("Evaluation", "400 episodes.")],
-         (f"Same 400 episodes: {ps0:.1f}% against plain DCT epoch 1 {d1:.1f}%." if ps0 is not None else "Training after plain DCT epoch 3." + xs0),
-         "See the training report for the paired test." if ps0 is not None else "Pending.",
-         short=(f"{ps0:.0f}% @ epoch 1" if ps0 is not None else sts0), link="training_report.html")
+          ("Training", lora("DCT without BPE, " + sqrtw_setup + ". From scratch with plain DCT's learning-rate history: epoch 1 under "
+                            "the 29,000-step cosine, epoch 2 resumed under 43,500 steps")),
+          ("Compared with", "Plain DCT at the same epoch."), ("Evaluation", "400 episodes after each epoch.")],
+         (f"Same 400 episodes: epoch 1 {ps0:.1f}% against plain DCT {d1:.1f}%"
+          + (f"; epoch 2 {ps2:.1f}% against plain DCT {fpct(f_dct.format(29000)):.1f}%" if ps2 is not None else
+             f"; epoch 2 training, step {s2st.get('step', 0)} / 29000" if e2_running else "; epoch 2 queued after the 5-level branch")
+          + "." if ps0 is not None else "Training after plain DCT epoch 3." + xs0),
+         "See the training report for the paired tests." if ps0 is not None else "Pending.",
+         short=(f"{ps2:.0f}% @ epoch 2" if ps2 is not None else f"{ps0:.0f}% @ epoch 1" if ps0 is not None else sts0),
+         link="training_report.html")
     pp, stp, xp = one("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_14500", "full_s0_poly_fixed_sqrtw")
     node("FPOLY", "FDCTWS", "Orthogonal polynomials + √step weighting · from scratch, 1 epoch", stp,
          "In the synthetic studies orthogonal polynomials ranked first of 18 transforms: a smooth edit of a motion moves the fewest tokens "
@@ -596,7 +610,7 @@ def build_nodes():
                             "epoch under the 29,000-step cosine")),
           ("Compared with", "√step-weighted DCT from scratch (same loss) and plain DCT at epoch 1."), ("Evaluation", "400 episodes.")],
          (f"Same 400 episodes: {pp:.1f}%" + (f" against √step-weighted DCT {ps0:.1f}%" if ps0 is not None else "")
-          + f" and plain DCT {d1:.1f}% at epoch 1." if pp is not None else "Queued after the 5-level stepped-weight DCT branch." + xp),
+          + f" and plain DCT {d1:.1f}% at epoch 1." if pp is not None else "Queued after epoch 2 of √step-weighted DCT." + xp),
          "See the training report for the paired tests." if pp is not None else "Pending.",
          short=(f"{pp:.0f}% @ epoch 1" if pp is not None else stp), link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",

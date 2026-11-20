@@ -42,7 +42,7 @@ if [ ! -d "runs/$ck" ]; then
 fi
 if [ -d "runs/$ck" ]; then
   evaluate "$ck" "${v}@${name}_step_14500"
-  cp -r --update=none "runs/$ck" "weights/${name}_step_14500"
+  [ -d "weights/${name}_step_14500" ] || cp -r "runs/$ck" "weights/${name}_step_14500"
   reports
 fi
 echo "[$(date)] finished $name; continuing the DCT control" | tee -a "$LOG"

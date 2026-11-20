@@ -813,8 +813,10 @@ def main() -> None:
                          + (f"; against plain DCT epoch 4 (same start, schedule and epoch, plain loss): {vs(a, dctp[4])}" if 4 in dctp else
                             "; plain DCT epoch 4, the matched comparison, is queued")
                          + (f"; against π₀-FAST LIBERO: {vs(a, ref)}" if ref else "") + ".")
-        if ("s0", 1) in dctw and 1 in dctp:
-            finds.append(f"<b>√step weighting on DCT from scratch, epoch 1:</b> {vs(dctw[('s0', 1)], dctp[1])} against plain DCT epoch 1.")
+        s0e = [e for e in sorted(e for t, e in dctw if t == "s0") if e in dctp]
+        if s0e:
+            finds.append("<b>√step weighting on DCT from scratch:</b> " + "; ".join(
+                f"epoch {e}: {vs(dctw[('s0', e)], dctp[e])} against plain DCT epoch {e}" for e in s0e) + ".")
         if 1 in polyd:
             finds.append(f"<b>Orthogonal polynomials (√step-weighted, from scratch), epoch 1:</b> {vs(polyd[1], dctp[1])} against plain DCT"
                          + (f", {vs(polyd[1], dctw[('s0', 1)])} against √step-weighted DCT" if ("s0", 1) in dctw else "") + ".")

@@ -48,7 +48,8 @@ for plan in "29000 14500" "43500 29000" "43500 43500" "58000 58000"; do
       || { echo "[$(date)] FAILED train $name" | tee -a "$LOG"; exit 1; }
   fi
   evaluate "$ck" "$(printf "%s@%s_step_%05d" $v "$name" "$STOP")"
-  cp -r --update=none "runs/$ck" "weights/$(printf "%s_step_%05d" "$name" "$STOP")"
+  dst="weights/$(printf "%s_step_%05d" "$name" "$STOP")"
+  [ -d "$dst" ] || cp -r "runs/$ck" "$dst"
   reports
 done
 echo "[$(date)] finished DCT control" | tee -a "$LOG"
