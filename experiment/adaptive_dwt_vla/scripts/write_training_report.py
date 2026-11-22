@@ -720,10 +720,11 @@ def main() -> None:
             "from 1.1·10⁻⁴ to 1.6·10⁻⁴), and epoch 4 under 58,000 steps, branched three times from the epoch-3 checkpoint with a different loss "
             "each (lr 4.6·10⁻⁵ decaying to 2·10⁻⁵). Epochs 1–3 used soft labels + scale weighting. The DCT control (no BPE, plain cross-entropy) "
             "repeats exactly this learning-rate history from scratch, and so does a plain-cross-entropy Haar run (2 epochs) that separates the "
-            "transform from the loss. Later runs test a gentler √step weighting on DCT (one epoch from the plain DCT epoch-2 checkpoint, one "
-            "epoch from scratch) and an orthogonal-polynomial tokenizer (the best basis in the synthetic "
-            "<a href='transform_shift_analysis.html'>token-shift</a> and <a href='transform_fingerprint_analysis.html'>fingerprint</a> "
-            "studies) with the same weighting from scratch. Every model is evaluated on the same 400 episodes: all four suites, every "
+            "transform from the loss. Later runs test a gentler √step weighting on DCT (one epoch from the plain DCT epoch-2 checkpoint, two "
+            "epochs from scratch), 5-level stepped weights as a fourth DCT epoch, and an orthogonal-polynomial tokenizer (the best basis in "
+            "the synthetic <a href='transform_shift_analysis.html'>token-shift</a>, <a href='transform_fingerprint_analysis.html'>fingerprint</a> "
+            "and <a href='transform_polynomial_variants.html'>polynomial-basis</a> studies) with the same √step weighting, two epochs from "
+            "scratch. Every model is evaluated on the same 400 episodes: all four suites, every "
             "task, initial states 0–9, suite-default step limits (Spatial/Object 280, Goal 300, LIBERO-10 520). LeRobot's "
             "<code>lerobot/pi0fast-libero</code> (full fine-tune on all of LIBERO) was evaluated by us, unmodified, on the same episodes.</p>")
         add(plot_full(full))
@@ -817,9 +818,30 @@ def main() -> None:
         if s0e:
             finds.append("<b>√step weighting on DCT from scratch:</b> " + "; ".join(
                 f"epoch {e}: {vs(dctw[('s0', e)], dctp[e])} against plain DCT epoch {e}" for e in s0e) + ".")
-        if 1 in polyd:
-            finds.append(f"<b>Orthogonal polynomials (√step-weighted, from scratch), epoch 1:</b> {vs(polyd[1], dctp[1])} against plain DCT"
-                         + (f", {vs(polyd[1], dctw[('s0', 1)])} against √step-weighted DCT" if ("s0", 1) in dctw else "") + ".")
+        suite_names = {"libero_spatial": "Spatial", "libero_object": "Object", "libero_goal": "Goal", "libero_10": "LIBERO-10"}
+
+        def suite_gaps(a, b):
+            out = []
+            for s, lab in suite_names.items():
+                sa = {k: v for k, v in a.items() if k[0] == s}
+                x, y = sum(sa[k] and not b[k] for k in sa), sum(b[k] and not sa[k] for k in sa)
+                if mcnemar_exact(x, y) < 0.05:
+                    out.append(f"{lab} {vs(sa, {k: b[k] for k in sa})}")
+            return out
+
+        pe = [e for e in sorted(polyd) if e in dctp]
+        if pe:
+            parts = []
+            for e in pe:
+                a = polyd[e]
+                txt = f"epoch {e}: {vs(a, dctp[e])} against plain DCT"
+                if ("s0", e) in dctw:
+                    txt += f", {vs(a, dctw[('s0', e)])} against √step-weighted DCT (same loss)"
+                    gaps = suite_gaps(a, dctw[("s0", e)])
+                    txt += (" (significant per suite against √step-weighted DCT: " + "; ".join(gaps) + ")") if gaps else \
+                        " (no suite differs significantly from √step-weighted DCT)"
+                parts.append(txt)
+            finds.append("<b>Orthogonal polynomials (√step-weighted, from scratch):</b> " + "; ".join(parts) + ".")
         dct_note = "".join(f"<p>{f}</p>" for f in finds)
         add(f"<p>Haar DWT fixed: {hs}; epoch 4 from the epoch-3 checkpoint: {e4}. "
             + (f"π₀-FAST LIBERO: {pct(ref)}. " if ref else "")

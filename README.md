@@ -1,174 +1,149 @@
-# Smooth Operator
+# Smooth Operator: Spectral Action Tokens for Vision-Language-Action Adaptation
 
-Smooth Operator studies whether a learned Vision-Language-Action (VLA) policy can reproduce and later smooth collision-free robot motion. It includes the original three-joint SCARA experiment and an official SO-101 arm for fine-tuning `lerobot/smolvla_base`. Both move an Apple, Coke can, or Pen through grid obstacles; unsmoothed eight-connected A* is the comparison baseline.
+Smooth Operator investigates how spectral representations of robot action chunks affect end-to-end learning efficiency and token structure when adapting a pretrained Vision-Language-Action (VLA) policy (`lerobot/pi0fast-base`) with LoRA on the **LIBERO** manipulation benchmark.
 
-## Current flow and status
+Under a shared calibration rule, 302-token vocabulary, and finite-state grammar mask (zero malformed streams), we compare localized spectral bases (**Haar wavelets**, fixed and adaptive) against global smooth bases (**DCT-II without BPE** and **discrete orthogonal Gram polynomials**), along with scale-aware loss variants.
+
+- **Final report (PDF + LaTeX source):** [`report/report.pdf`](report/report.pdf) / [`report/report.tex`](report/report.tex)
+- **Interactive HTML experiment reports:** [`experiment/reports/training_report.html`](experiment/reports/training_report.html), [`experiment/reports/experiment_trail.html`](experiment/reports/experiment_trail.html), [`experiment/reports/wavelet_selection.html`](experiment/reports/wavelet_selection.html), [`experiment/reports/transform_shift_analysis.html`](experiment/reports/transform_shift_analysis.html), [`experiment/reports/transform_polynomial_variants.html`](experiment/reports/transform_polynomial_variants.html)
+- **Detailed experiment README & commands:** [`experiment/adaptive_dwt_vla/README.md`](experiment/adaptive_dwt_vla/README.md)
+
+## Key Results (LIBERO, Closed-Loop Simulation)
+
+### Full 40-Task LIBERO (400 episodes: 10 initial states x 40 tasks, seed 0)
+
+| Model | Epoch 1 (14.5k steps) | Epoch 2 (29k steps) | Epoch 2 LIBERO-10 |
+|---|---:|---:|---:|
+| Haar DWT fixed (soft labels + step-weighted, $p=1$) | 53.0% (212/400) | 69.0% (276/400) | 46% |
+| Haar DWT fixed (plain CE) | 58.5% (234/400) | 79.2% (317/400) | 54% |
+| DCT-II, no BPE (plain CE) | 77.0% (308/400) | 85.5% (342/400) | 66% |
+| DCT-II, no BPE ($\sqrt{\text{step}}$-weighted, $p=0.5$) | 79.5% (318/400) | 88.2% (353/400) | 70% |
+| **Gram orthogonal polynomials ($\sqrt{\text{step}}$-weighted, $p=0.5$)** | **81.2% (325/400)** | **90.2% (361/400)** | **81%** |
+
+- At **epoch 1**, Gram polynomials reach 81.2% overall and **91% on LIBERO-Goal** (vs. 72% for matched $\sqrt{\text{step}}$-weighted DCT, paired exact McNemar $p = 3.1\times 10^{-4}$).
+- At **epoch 2**, Gram polynomials reach **90.2%** overall, significantly beating plain DCT (85.5%, $p = 0.020$) and plain Haar (79.2%, $p = 8.0\times 10^{-6}$), with **81% on LIBERO-10** (+15 points over plain DCT, $p = 0.011$).
+- Synthetic token-shift analysis (400 smooth trajectories, 9 geometric edits, equal-accuracy quantizer) predicts this exact ordering: small smooth edits change **22%** of tokens in Gram polynomials, **30%** in DCT-II, and **69%** in Haar.
+
+### Single-Task LIBERO-Object #0 (60 episodes: 3 seeds x 20 initial states, 2,000 updates)
+
+| Variant | Success @1,000 | Success @2,000 | Tokens/chunk | Latency (ms) |
+|---|---:|---:|---:|---:|
+| Matched FAST (DCT + BPE) | 31/60 (51.7%) | 17/60 (28.3%) | 29.6 | 567 |
+| Adaptive Haar (plain CE) | 26/60 (43.3%) | 39/60 (65.0%) | 61.6 | 1,024 |
+| DCT-II, no BPE (plain CE) | 29/60 (48.3%) | 43/60 (71.7%) | 64.1 | 1,035 |
+| Fixed Haar (soft + step-weighted) | 37/60 (61.7%) | 52/60 (86.7%) | 69.1 | 1,185 |
+| **Fixed Haar (plain CE)** | **47/60 (78.3%)** | **53/60 (88.3%)** | 69.1 | 1,134 |
+
+## Repository Layout
 
 ```text
-Natural-language task + RGB image + robot state
-                      |
-       SmolVLA predicts 10-action chunks
-                      |
-     simulator validates every predicted action
-              /                       \
-       action is safe             action is unsafe
-              |                       |
-       execute SmolVLA          stop and report failure
+smooth-operator/
+├── report/                              # Final NeurIPS-style report (report.pdf, report.tex, figures/)
+├── experiment/
+│   ├── adaptive_dwt_vla/
+│   │   ├── src/lerobot_policy_adaptive_dwt/  # Spectral codecs (Haar, DCT, Gram poly), FSM grammar, LoRA policy plugin
+│   │   ├── scripts/                     # Data prep, offline analyses, training, LIBERO eval, report builders
+│   │   ├── results/                     # Per-episode LIBERO JSONs, offline CSVs/JSONs, summary.md
+│   │   ├── weights/                     # Released LoRA adapter checkpoints (Git LFS)
+│   │   └── tests/                       # CPU and GPU unit tests
+│   └── reports/                         # Self-contained HTML reports (training, trail, synthetic studies)
+├── presentations/                       # Interactive HTML presentation slides and media assets
+├── src/smooth_operator/                 # Web studio, LIBERO inference server, and legacy SCARA/SO-101 simulator
+└── tests/                               # Simulator and studio unit tests
 ```
 
-The Python 3.9 simulator generates collision-free A* demonstrations. SO-101 episodes contain three `256×256` RGB observations and calibrated six-dimensional states/actions at 30 Hz. A Python 3.12 process converts these episodes to LeRobot format, trains SmolVLA, and serves inference to the simulator over a local socket.
+## Setup and Reproduction
 
-Completed so far:
+### 1. Environment (Python 3.12 + CUDA GPU)
 
-- Collision-aware low-height 2D manipulation, randomized objects and rectangular obstacles, A* planning, safety validation, metrics, and trajectory graphs.
-- 600 valid SCARA demonstrations generated and converted: 468 training, 71 validation, and 61 held-out evaluation episodes.
-- The SmolVLA download, conversion, training, and socket pipelines have passed smoke tests.
-- The SO-101 path supplies the model's native six-dimensional state/action interface plus overhead, wrist, and side cameras. It supports matched A* and learned-only runs without safety fallback hiding model failures.
-
-SmolVLA has **not yet been fully trained on the 600 episodes**. Only a one-step CPU training smoke test was completed, so the present learned checkpoint should not be used for a performance comparison.
-
-## Setup
-
-Create separate environments because the simulator uses Python 3.9 while LeRobot/SmolVLA requires Python 3.12. Use `python3.9` and `python3.12` where those commands are available; the Windows Python Launcher equivalents are `py -3.9` and `py -3.12`.
+Tested on an NVIDIA RTX A6000 (48 GB) with Python 3.12, PyTorch 2.11 (`cu128`), `lerobot==0.6.1`, `transformers==5.5.4`, and `PyWavelets==1.8.0`.
 
 ```bash
-python3.9 -m venv .venv
-python3.12 -m venv .venv312
+conda create -n smooth-operator-vla python=3.12 -y
+conda activate smooth-operator-vla
+
+# Install base package and VLA dependencies
+pip install -e ".[vla]"
+pip install pywavelets pytest matplotlib protobuf sentencepiece
+
+# Install LIBERO simulator dependencies (EGL headless rendering)
+pip install --no-deps hf-libero==0.1.4 robomimic==0.2.0
+pip install robosuite==1.4.0 mujoco bddl easydict einops future hydra-core thop h5py imageio imageio-ffmpeg tensorboardX termcolor
+
+# Register the spectral-token policy plugin
+cd experiment/adaptive_dwt_vla
+pip install --no-deps --no-build-isolation -e .
 ```
 
-Activate `.venv`, then install the simulator:
+The $\pi_0$-FAST base model requires access to the gated `google/paligemma-3b-pt-224` tokenizer on Hugging Face (`hf auth login`). Adapter checkpoints in `experiment/adaptive_dwt_vla/weights/` are stored with Git LFS (`git lfs pull`).
+
+### 2. Run Unit Tests and Offline Analyses (CPU)
 
 ```bash
-python -m pip install --upgrade pip wheel setuptools
-python -m pip install -e .
+cd experiment/adaptive_dwt_vla
+
+# Codec, grammar FSM, and oracle tests
+pytest -q -m "not gpu"
+
+# Prepare LIBERO index and per-task 90/10 split (seed 0)
+python scripts/prepare_libero.py
+
+# Offline wavelet ranking and synthetic token-shift / polynomial studies
+python scripts/wavelet_selection.py
+python scripts/transform_shift_analysis.py
+python scripts/transform_fingerprint_analysis.py
+python scripts/transform_topk_shift_analysis.py
+python scripts/transform_polynomial_variants.py
 ```
 
-Activate `.venv312`, then install the training tools:
+### 3. Train and Evaluate on Full LIBERO (GPU)
 
 ```bash
-python -m pip install --upgrade pip wheel setuptools
-python -m pip install -e ".[vla]"
+cd experiment/adaptive_dwt_vla
+
+# Train Gram orthogonal polynomials with sqrt-step weighting (epoch 1 = 14,500 steps)
+python scripts/train.py --variant poly_fixed --weight-power 0.5 \
+  --name full_s0_poly_fixed_sqrtw --seed 0 --tasks $(seq 0 39) \
+  --horizon 10 --steps 29000 --stop-at 14500 \
+  --micro-batch 8 --grad-accum 2 --lr 2e-4 --warmup 300
+
+# Resume for epoch 2 (to 29,000 steps under the 43,500-step cosine)
+python scripts/train.py --variant poly_fixed --weight-power 0.5 \
+  --name full_s0_poly_fixed_sqrtw --seed 0 --tasks $(seq 0 39) \
+  --horizon 10 --steps 43500 --stop-at 29000 --resume \
+  --micro-batch 8 --grad-accum 2 --lr 2e-4 --warmup 300
+
+# Closed-loop LIBERO evaluation (10 episodes/task across each suite)
+for suite in libero_spatial libero_object libero_goal libero_10; do
+  MUJOCO_GL=egl python scripts/evaluate_policy.py \
+    --models ckpt:full_s0_poly_fixed_sqrtw/ckpt/step_29000 \
+    --suite "$suite" --task-ids 0 1 2 3 4 5 6 7 8 9 \
+    --episodes 10 --first-init-state 0 --videos 0 --label-prefix full40_
+done
+
+# Regenerate all summary tables and HTML reports
+python scripts/write_reports.py
+python scripts/write_training_report.py
+python scripts/write_experiment_trail.py
 ```
 
-On macOS and Linux, activate an environment with `source .venv/bin/activate` or `source .venv312/bin/activate`. On Windows PowerShell, use `.venv\Scripts\Activate.ps1` or `.venv312\Scripts\Activate.ps1`. If PyBullet has no wheel for the platform, install the platform compiler toolchain before installing the simulation environment.
+Replace `--variant poly_fixed --weight-power 0.5` with `dct_fixed`, `dwt_fixed`, or `dwt_fixed_slw` to reproduce the DCT and Haar baselines. See [`experiment/adaptive_dwt_vla/README.md`](experiment/adaptive_dwt_vla/README.md) for single-task commands and queue scripts.
 
-All commands below are the installed console commands and are independent of the operating system once the relevant environment is active. MPS is PyTorch's Apple GPU backend. `--device cpu` is portable but slow; `--device mps` requires compatible Apple hardware and a PyTorch installation where MPS is available.
-
-## Run and produce graphs
-
-Run the matched SO-101 A* baseline:
+### 4. Recompile the Final Report
 
 ```bash
-smooth-operator --robot so101 --controller astar --seed 42 --prompt "Move the apple to the target" --chart artifacts/so101_astar.png --result artifacts/so101_astar.json
+cd report
+pdflatex report.tex && pdflatex report.tex
 ```
 
-The web studio (`smooth-operator-web`) requires HTTP Basic auth on every route; set `SMOOTH_OPERATOR_USER` and `SMOOTH_OPERATOR_PASSWORD` before starting it. It starts and stops the inference server itself. It looks for the Python 3.12 interpreter in `SMOOTH_OPERATOR_VLA_PYTHON`, then a sibling conda env named `smooth-operator-vla`, then `.venv312`. Fine-tuned checkpoints under `checkpoints/**/pretrained_model` appear in its model list automatically.
+## Web Studio and Legacy Simulator
 
-The studio's models are defined in `src/smooth_operator/vla_models.py`. Each model appears under the tab that matches its native action output. The **Time domain** tab holds the continuous-action models (SmolVLA, MolmoAct2 SO-100/101, π0.5 and π0), which run with the `direct` decoder. The **Frequency domain** tab holds the models that predict FAST tokens (DCT coefficients). Their DCT-family decoders (`fast_idct`, `band_idct`, `custom_hybrid`) invert the coefficients the model itself predicted. Models that cannot drive the SO-101 joints are listed but disabled, each with its reason. The π models need the gated `google/paligemma-3b-pt-224` tokenizer: accept its license on Hugging Face and run `hf auth login` in the Python 3.12 environment. They also need `pip install protobuf sentencepiece`.
+This repository also includes the interactive web studio (`smooth-operator-web`) and the earlier PyBullet SCARA/SO-101 A* and SmolVLA pipelines under `src/smooth_operator/`.
 
-Each model in the list is a family with one checkpoint per environment. Step 2, **Select Environment**, offers two kinds of environment. The LIBERO benchmark suites (Object, Spatial, Goal, Long) run a Franka Panda in MuJoCo, and LeRobot publishes LIBERO fine-tunes of SmolVLA, MolmoAct2, π0.5, π0, π0-FAST and X-VLA for them. The custom PyBullet setups are the SO-101 and SCARA arrangements. Selecting a model opens its default environment: a LIBERO suite when it has a LIBERO checkpoint, otherwise SO-101. You can then switch to any other environment. A ✓ marks environments where the model has a runnable checkpoint, and the matching checkpoint is loaded on the inference server. In a LIBERO suite, each prompt chip is one benchmark task and shows that task's initial scene. The episode runs closed-loop inside the inference server (`smooth_operator.libero_env`), and success is LIBERO's own goal check.
-
-The studio also serves `/terminal`, an interactive shell at the project root with live output (xterm.js on a pseudo-terminal, shared by every open terminal page), and `/browse`, a file browser that downloads files, uploads files or whole folders, and creates folders. The file browser never deletes or overwrites anything, but the terminal can run any command as your user. Both only answer requests from the studio's own pages and are disabled when `--host` is not a loopback address unless you pass `--allow-remote-tools`. Anyone who can reach the port then gets a shell.
-
-LIBERO goes in the Python 3.12 environment: `pip install --no-deps hf-libero==0.1.4 robomimic==0.2.0`, then their remaining requirements except `hf-egl-probe`/`egl_probe`, `wandb` and `tensorboard`, none of which are needed for evaluation: `pip install robosuite==1.4.0 mujoco bddl easydict einops future hydra-core thop h5py imageio imageio-ffmpeg tensorboardX termcolor`. The `egl_probe` packages need a C compiler to build. Then import `libero` once and answer its config prompt. Rendering uses `MUJOCO_GL=egl`.
-
-StarVLA Qwen2.5-VL-FAST (`StarVLA/Qwen2.5-VL-FAST-LIBERO-4in1`) is not a LeRobot policy. It runs through StarVLA's own code, which the inference server expects at `../third_party/starVLA` (next to this repository) or at `$STARVLA_ROOT`: `git clone https://github.com/starVLA/starVLA ../third_party/starVLA`. Its model code needs nothing beyond the Python 3.12 environment. The checkpoint (8 GB) and its base VLM `StarVLA/Qwen2.5-VL-3B-Instruct-Action` (7.5 GB) download on first use.
-
-If the GPU driver is older than the CUDA build PyTorch ships with, reinstall PyTorch from the matching index, e.g. `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128`.
-
-For SmolVLA, start the Python 3.12 inference server with the trained checkpoint:
-
-```bash
-smooth-operator-inference-server --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --device auto
-```
-
-Then run the same scene and prompt from the Python 3.9 simulation environment:
-
-```bash
-smooth-operator --robot so101 --controller smolvla --learned-only --seed 42 --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --prompt "Move the apple to the target" --chart artifacts/so101_smolvla.png --result artifacts/so101_smolvla.json
-```
-
-Run a matched multi-seed comparison while the server is running:
-
-```bash
-smooth-operator-compare --episodes 5 --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --charts artifacts/so101-comparison --output artifacts/so101-comparison.json
-```
-
-This produces per-controller trajectory and joint graphs, raw learned actions, failures, aggregate success and collision rates, endpoint error, path length, jerk, and inference-versus-planning latency. SmolVLA is evaluated without A* fallback; a rejected action is recorded as a learned failure.
-
-The original SCARA commands remain available:
-
-Run the deterministic baseline and save its result plus a graph of X/Y position, planar speed, and the XY path around obstacles:
-
-```bash
-smooth-operator --headless --move apple --chart artifacts/astar_apple.png --result artifacts/astar_apple.json
-
-# Replace apple with coke_can or pen. Omit --headless to watch the simulation.
-smooth-operator --move pen --hold 10 --chart artifacts/astar_pen.png --result artifacts/astar_pen.json
-```
-
-Objects can also be moved using natural-language prompts. With `--controller astar`, the prompt resolver determines the object and destination, and A* executes the motion:
-
-```bash
-smooth-operator --prompt "Move the apple to the target" --controller astar --chart artifacts/prompt_apple.png --result artifacts/prompt_apple.json
-
-smooth-operator --prompt "Place the pen to the right of the Coke can" --controller astar --result artifacts/prompt_pen.json
-```
-
-Supported instructions identify an Apple, Coke can, or Pen and either the target/goal/destination or a spatial relation such as left, right, in front of, or behind another object. SmolVLA will accept broader paraphrases after full fine-tuning.
-
-Run tests and an A* evaluation over held-out prompts and scene seeds:
-
-```bash
-python -m unittest discover -s tests -v
-smooth-operator-evaluate --controller astar --episodes 100 --output artifacts/astar_evaluation.json
-```
-
-The PNG files show the current unsmoothed baseline and expose abrupt changes at A* corners. The JSON files contain path length, planning time, velocity, acceleration, jerk, collision count, and success data. After full SmolVLA training, run the learned evaluation below and compare its JSON metrics with `astar_evaluation.json`. Learned trajectory plots are the next reporting task; currently the automatic PNG plot is produced by the A* controller.
-
-## Data, training, and learned evaluation
-
-Generate a pilot and full SO-101 expert dataset in Python 3.9, then convert it in Python 3.12:
-
-```bash
-smooth-operator-generate-raw --robot so101 --episodes 50 --output datasets/so101-pilot
-smooth-operator-generate-raw --robot so101 --episodes 600 --output datasets/so101-raw-600
-
-smooth-operator-convert --input datasets/so101-raw-600 --output datasets/so101-lerobot --repo-id local/smooth_operator_so101
-```
-
-Fine-tune on the converted training split:
-
-```bash
-smooth-operator-train --dataset-repo local/smooth_operator_so101_train --dataset-root datasets/so101-lerobot/train --output checkpoints/so101-smolvla --steps 20000 --device auto
-```
-
-`--device auto` selects CUDA, then MPS, then CPU. Model files are cached in the default Hugging Face cache unless `HF_HOME` is configured for the shell.
-
-After training, start inference in the Python 3.12 terminal:
-
-```bash
-smooth-operator-inference-server --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --device auto
-```
-
-Then run the matched SO-101 comparison from a second, Python 3.9 terminal:
-
-```bash
-smooth-operator-compare --episodes 5 --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --charts artifacts/so101-comparison --output artifacts/so101-comparison.json
-```
-
-For an individual learned prompt, keep the inference server running and execute this in the simulation environment:
-
-```bash
-smooth-operator --robot so101 --prompt "Carry the Coke can to the destination" --controller smolvla --learned-only --checkpoint checkpoints/so101-smolvla/checkpoints/020000/pretrained_model --result artifacts/so101-smolvla-prompt.json
-```
-
-## Next steps
-
-1. **Generate and train the SO-101 dataset on suitable compute.** The existing 600 episodes belong to SCARA and remain archived. Use CUDA for the full SO-101 run where available.
-2. **Select and evaluate checkpoints.** Measure learned-only success, collision-free success, prompt success, latency, path length, and jerk on held-out seeds.
-3. **Collect failure-focused data.** Add unsuccessful objects, prompts, destinations, and obstacle layouts to the dataset and resume training until learned-only completion reaches the target.
-4. **Compare A* and learned-only SmolVLA.** Use identical prompts and seeds and retain the trajectory, joint, velocity, acceleration, jerk, endpoint, and aggregate success outputs.
-5. **Implement frequency-domain conditioning.** Use the unsmoothed A* demonstrations as the baseline, suppress undesirable high-frequency action components, retrain or condition the policy, and compare smoothness without reducing task or collision-free success.
-
-Datasets, model weights, checkpoints, and generated artifacts stay outside source control because they are large and machine-specific.
+- **Web Studio:** set `SMOOTH_OPERATOR_USER` and `SMOOTH_OPERATOR_PASSWORD` (HTTP Basic auth is required on every route) and launch `smooth-operator-web`. It runs LIBERO and SO-101 closed-loop inference across time-domain and frequency-domain VLA checkpoints.
+- **PyBullet SCARA / SO-101 baseline:** install `pip install -e .` in a Python 3.9 environment and run:
+  ```bash
+  smooth-operator --robot so101 --controller astar --seed 42 \
+    --prompt "Move the apple to the target" \
+    --chart artifacts/so101_astar.png --result artifacts/so101_astar.json
+  ```

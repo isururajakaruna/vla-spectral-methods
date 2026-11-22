@@ -595,16 +595,21 @@ def build_nodes():
           + (f"; epoch 2 {ps2:.1f}% against plain DCT {fpct(f_dct.format(29000)):.1f}%" if ps2 is not None else
              f"; epoch 2 training, step {s2st.get('step', 0)} / 29000" if e2_running else "; epoch 2 queued after the 5-level branch")
           + "." if ps0 is not None else "Training after plain DCT epoch 3." + xs0),
-         "See the training report for the paired tests." if ps0 is not None else "Pending.",
+         ("Ahead of plain DCT at both epochs (+2.5 and +2.7 points) but neither difference is significant (paired p = 0.35 and 0.23). "
+          "Epoch 2 is level with plain DCT epoch 3 (88.2% vs 89.2%, p = 0.70), one epoch earlier, and has the best Spatial (96%), Object "
+          "(99%) and Goal (88%) of any DCT model at epoch 2. The LIBERO-10 lead shrank from +10 points at epoch 1 to +4 at epoch 2."
+          if ps2 is not None else "See the training report for the paired tests.") if ps0 is not None else "Pending.",
          short=(f"{ps2:.0f}% @ epoch 2" if ps2 is not None else f"{ps0:.0f}% @ epoch 1" if ps0 is not None else sts0),
          link="training_report.html")
     pp, stp, xp = one("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_14500", "full_s0_poly_fixed_sqrtw")
     pp2 = fpct("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_29000")
+    pp3 = fpct("full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_43500")
     p2st = run_status("full_s0_poly_fixed_sqrtw")[1] or {}
     p2_running = pp is not None and pp2 is None and p2st.get("step", 0) > 14500
+    p3_running = pp2 is not None and pp3 is None and p2st.get("step", 0) > 29000
     ps2w = fpct("full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_29000")
-    node("FPOLY", "FDCTWS", "Orthogonal polynomials + √step weighting · from scratch, 2 epochs",
-         "done" if pp2 is not None else "running" if p2_running else stp if pp is None else "planned",
+    node("FPOLY", "FDCTWS", "Orthogonal polynomials + √step weighting · from scratch, 3 epochs",
+         "done" if pp3 is not None else "running" if p2_running or p3_running else stp if pp is None else "done",
          "In the synthetic studies orthogonal polynomials ranked first of 18 transforms: a smooth edit of a motion moves the fewest tokens "
          "(22% vs 30% for DCT and 69% for Haar), and different edits land on different tokens. Offline on LIBERO chunks the polynomial "
          "codec is as accurate as DCT at the same 64 tokens (MSE 1.64e-4 vs 1.65e-4).",
@@ -612,17 +617,31 @@ def build_nodes():
          [("Base model", BASE), ("Training data", "As the Haar full-LIBERO run."),
           ("Training", lora("poly_fixed: Legendre polynomials orthonormalized on the 10 sample points, grouped by degree (0, 1, 2–3, 4–9) "
                             "like the DCT bands, same quantizer, vocabulary and grammar, no BPE; " + sqrtw_setup + ". From scratch with "
-                            "DCT's learning-rate history: epoch 1 under the 29,000-step cosine, epoch 2 resumed under 43,500 steps")),
+                            "DCT's learning-rate history: epoch 1 under the 29,000-step cosine, epochs 2–3 resumed under 43,500 steps")),
           ("Compared with", "√step-weighted DCT from scratch (same loss) and plain DCT at the same epoch."),
           ("Evaluation", "400 episodes after each epoch.")],
          (f"Same 400 episodes: epoch 1 {pp:.1f}%" + (f" against √step-weighted DCT {ps0:.1f}%" if ps0 is not None else "")
           + f" and plain DCT {d1:.1f}%"
           + (f"; epoch 2 {pp2:.1f}%" + (f" against √step-weighted DCT {ps2w:.1f}%" if ps2w is not None else "")
-             + f" and plain DCT {fpct(f_dct.format(29000)):.1f}%" if pp2 is not None else
-             f"; epoch 2 training, step {p2st.get('step', 0)} / 29000" if p2_running else "; epoch 2 queued")
+             + f" and plain DCT {fpct(f_dct.format(29000)):.1f}%"
+             + (f"; epoch 3 {pp3:.1f}% against plain DCT {d3:.1f}%" if pp3 is not None else
+                f"; epoch 3 training, step {p2st.get('step', 0)} / 43500" if p3_running else "")
+             if pp2 is not None else
+             f"; epoch 2 training, step {p2st.get('step', 0)} / 29000" if p2_running else
+             "; epoch 2 evaluating" if p2st.get("step", 0) >= 29000 else "; epoch 2 queued")
           + "." if pp is not None else "Queued after epoch 2 of √step-weighted DCT." + xp),
-         "See the training report for the paired tests." if pp is not None else "Pending.",
-         short=(f"{pp2:.0f}% @ epoch 2" if pp2 is not None else f"{pp:.0f}% @ epoch 1" if pp is not None else stp),
+         ("Best model at both epoch 1 (81.2%, Goal 91% vs 72% for matched DCT, p < 0.001) and epoch 2 (90.2%, beating plain DCT 85.5% "
+          "with p = 0.020 and plain Haar 79.2% with p < 1e-5, and matching fully fine-tuned π₀-FAST LIBERO at 89.8% in just 2 LoRA epochs). "
+          "At epoch 2 LIBERO-10 jumped 25 points to 81%, significantly ahead of plain DCT (66%, p = 0.011). Against √step-weighted DCT at "
+          "epoch 2 (88.2%) the +2.0 point lead is not significant overall (p = 0.41). Epoch 3 is now training. See the training report for "
+          "paired tests."
+          if pp2 is not None else
+          "Epoch 1 is the best first epoch of any tokenizer, but overall it ties both DCT runs (p = 0.10 against plain, 0.53 against "
+          "√step-weighted). The gain is concentrated in Goal: 91% against 72% for DCT with the same loss (paired p < 0.001) and 76% for "
+          "plain DCT (p = 0.006), above every DCT model at any epoch. See the training report for the paired tests."
+          if pp is not None else "Pending."),
+         short=(f"{pp3:.0f}% @ epoch 3" if pp3 is not None else f"{pp2:.0f}% @ epoch 2" if pp2 is not None else
+                f"{pp:.0f}% @ epoch 1" if pp is not None else stp),
          link="training_report.html")
     node("E", "LC", "Stage E · 32-step chunks", "planned",
          "Offline, at 32-step chunks adaptive DWT saves 17% tokens over fixed and sym4→haar beats Haar by about 5%; longer chunks are where "
