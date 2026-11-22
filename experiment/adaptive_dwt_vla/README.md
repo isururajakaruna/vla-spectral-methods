@@ -39,8 +39,9 @@ lerobot 0.6.1, transformers 5.5.4, PyWavelets 1.8.0. The LIBERO simulator and th
 parent `smooth-operator` package (installed in the same env).
 
 ```bash
-PY=/home/isuru/miniconda3/envs/smooth-operator-vla/bin/python
-cd smooth-operator/experiment/adaptive_dwt_vla
+conda activate smooth-operator-vla
+PY=python
+cd experiment/adaptive_dwt_vla
 $PY -m pip install pywavelets pytest matplotlib
 $PY -m pip install --no-deps --no-build-isolation -e .     # registers the lerobot_policy_adaptive_dwt plugin
 ```
@@ -116,8 +117,8 @@ epochs 1–3 (`full_s0_dwt_fixed_slw_step_{14500,29000,43500}`), the three epoch
 (`full_e4_{dwt_fixed,dwt_fixed_lw,dwt_fixed_slw}_step_58000`), and the DCT-without-BPE control after each epoch
 (`full_s0_dct_fixed_step_*`, added as `scripts/run_full_dct_control.sh` finishes), plain Haar from scratch
 (`full_s0_dwt_fixed_step_*`), DCT with √step weighting one epoch from DCT epoch 2 (`full_e3_dct_fixed_sqrtw_step_43500`)
-and from scratch (`full_s0_dct_fixed_sqrtw_step_14500`), and orthogonal-polynomial tokens (`--variant poly_fixed`) with
-the same weighting (`full_s0_poly_fixed_sqrtw_step_14500`). `train.py --weight-power p` weights coefficient-token losses
+and from scratch (`full_s0_dct_fixed_sqrtw_step_{14500,29000}`), and orthogonal-polynomial tokens (`--variant poly_fixed`) with
+the same weighting (`full_s0_poly_fixed_sqrtw_step_{14500,29000}`). `train.py --weight-power p` weights coefficient-token losses
 by quantizer step ** p for any DWT/DCT/polynomial variant. Every intermediate checkpoint of these runs stays in `runs/`
 and is mirrored to the data partition; success per epoch is in section 7b of the report.
 
@@ -126,7 +127,10 @@ weights, wavelet choice), rebuilt from `runs/` and `results/` by `python scripts
 `../reports/wavelet_selection.html` (offline comparison of 26 wavelet transforms) by `python scripts/wavelet_selection.py`;
 `../reports/transform_shift_analysis.html` (synthetic: how many tokens a visible edit of a smooth motion shifts under 18
 transforms) by `python scripts/transform_shift_analysis.py`; `../reports/transform_fingerprint_analysis.html` (whether
-different edits leave distinct token patterns) by `python scripts/transform_fingerprint_analysis.py`. `runs/`, `data_cache/`,
+different edits leave distinct token patterns) by `python scripts/transform_fingerprint_analysis.py`;
+`../reports/transform_topk_shift_analysis.html` (top-3% coefficient shift) by `python scripts/transform_topk_shift_analysis.py`;
+`../reports/transform_polynomial_variants.html` (polynomial & spline bases) by `python scripts/transform_polynomial_variants.py`;
+and `../reports/experiment_trail.html` (chronological experiment graph) by `python scripts/write_experiment_trail.py`. `runs/`, `data_cache/`,
 rollout videos, logs and dataset-derived example plots are not committed.
 
 ## Known limitations

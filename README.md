@@ -1,11 +1,18 @@
 # Smooth Operator: Spectral Action Tokens for Vision-Language-Action Adaptation
 
+> **Quick navigation for reviewers**
+> - **Final Report (PDF):** [`report/report.pdf`](report/report.pdf) ([LaTeX source](report/report.tex))
+> - **Interactive Experiment Dashboard (HTML):** [`experiment/reports/training_report.html`](experiment/reports/training_report.html) | [Experiment Trail](experiment/reports/experiment_trail.html)
+> - **Core Spectral Codec & Policy Code:** [`experiment/adaptive_dwt_vla/src/lerobot_policy_adaptive_dwt/`](experiment/adaptive_dwt_vla/src/lerobot_policy_adaptive_dwt/)
+> - **Measured LIBERO Results (400-ep JSONs & Summary):** [`experiment/adaptive_dwt_vla/results/summary.md`](experiment/adaptive_dwt_vla/results/summary.md)
+> - **Released LoRA Adapter Checkpoints (Git LFS):** [`experiment/adaptive_dwt_vla/weights/`](experiment/adaptive_dwt_vla/weights/)
+> - **Presentation Slides (HTML):** [`presentations/single/smooth_operator_deck.html`](presentations/single/smooth_operator_deck.html)
+
 Smooth Operator investigates how spectral representations of robot action chunks affect end-to-end learning efficiency and token structure when adapting a pretrained Vision-Language-Action (VLA) policy (`lerobot/pi0fast-base`) with LoRA on the **LIBERO** manipulation benchmark.
 
 Under a shared calibration rule, 302-token vocabulary, and finite-state grammar mask (zero malformed streams), we compare localized spectral bases (**Haar wavelets**, fixed and adaptive) against global smooth bases (**DCT-II without BPE** and **discrete orthogonal Gram polynomials**), along with scale-aware loss variants.
 
-- **Final report (PDF + LaTeX source):** [`report/report.pdf`](report/report.pdf) / [`report/report.tex`](report/report.tex)
-- **Interactive HTML experiment reports:** [`experiment/reports/training_report.html`](experiment/reports/training_report.html), [`experiment/reports/experiment_trail.html`](experiment/reports/experiment_trail.html), [`experiment/reports/wavelet_selection.html`](experiment/reports/wavelet_selection.html), [`experiment/reports/transform_shift_analysis.html`](experiment/reports/transform_shift_analysis.html), [`experiment/reports/transform_polynomial_variants.html`](experiment/reports/transform_polynomial_variants.html)
+- **Synthetic & offline study reports:** [`wavelet_selection.html`](experiment/reports/wavelet_selection.html), [`transform_shift_analysis.html`](experiment/reports/transform_shift_analysis.html), [`transform_fingerprint_analysis.html`](experiment/reports/transform_fingerprint_analysis.html), [`transform_topk_shift_analysis.html`](experiment/reports/transform_topk_shift_analysis.html), [`transform_polynomial_variants.html`](experiment/reports/transform_polynomial_variants.html)
 - **Detailed experiment README & commands:** [`experiment/adaptive_dwt_vla/README.md`](experiment/adaptive_dwt_vla/README.md)
 
 ## Key Results (LIBERO, Closed-Loop Simulation)

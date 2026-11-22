@@ -54,7 +54,7 @@ When training scales to all 40 LIBERO tasks, however, wavelets fall behind DCT a
 A controlled synthetic test explains this reversal: when a smooth trajectory changes slightly, DCT changes 30\% of its tokens while Haar rewrites 69\%, turning multi-task adaptation into a learning-complexity problem rather than a reconstruction-error problem.
 The same test ranks Gram orthogonal polynomials first (22\% of tokens changed).
 Replacing DCT with Gram polynomials gives our best accuracy across all 40 tasks at both epochs: 81.2\% (325/400) at epoch 1 (91\% on LIBERO-Goal vs.\ 72\% for matched DCT, $p = 3.1\times 10^{-4}$) and 90.2\% (361/400) at epoch 2, significantly ahead of plain DCT (85.5\%, $p = 0.020$, with 81\% vs.\ 66\% on LIBERO-10, $p = 0.011$) and plain Haar (79.2\%, $p = 8.0\times 10^{-6}$).
-Code and reproduction instructions: \url{https://github.com/vadirajrao/smooth-operator}.
+Code and reproduction instructions: \url{https://github.com/isururajakaruna/vla-spectral-methods}.
 \end{abstract}
 
 \section{Introduction}
@@ -79,7 +79,7 @@ Our experiments follow a clear sequence:
 (3) Scaling to all 40 LIBERO tasks reverses the ranking already at epoch 1, with DCT at 77.0\% versus 58.5\% for plain Haar and 53.0\% for soft-weighted Haar.
 (4) A synthetic perturbation test shows that small smooth path changes rewrite 69\% of Haar tokens versus 30\% of DCT tokens and 22\% of Gram polynomial tokens, pointing directly to orthogonal polynomials; trained from scratch, Gram polynomials reach 81.2\% at epoch 1 and 90.2\% at epoch 2, outperforming both plain DCT (85.5\%) and plain Haar (79.2\%).
 Throughout the 40-task study, we compare all five variants across epochs 1 and 2 under identical schedules and evaluation episodes.
-Code, checkpoints, and run commands are public at \url{https://github.com/vadirajrao/smooth-operator}.
+Code, checkpoints, and run commands are public at \url{https://github.com/isururajakaruna/vla-spectral-methods}.
 
 \section{Related Work}
 \label{sec:related}
@@ -442,7 +442,7 @@ Shared training settings: NVIDIA RTX A6000 (48 GB, bf16), micro-batch 8 $\times$
 Token stream grammar for whole-window DCT and Gram polynomials: \code{<RES\_k>}, 60 quantized coefficient tokens in row-major order (band, dimension), gripper initial state, gripper transition offsets, \code{<G\_END>}, \code{<A\_END>} ($\approx 64.1$ tokens/chunk).
 Quantizer step ranges across the 60 coefficient positions: $[0.0070, 0.1793]$ for DCT and $[0.0068, 0.1793]$ for Gram polynomials.
 
-Code and adapter weights (via Git LFS) are at \url{https://github.com/vadirajrao/smooth-operator}.
+Code and adapter weights (via Git LFS) are at \url{https://github.com/isururajakaruna/vla-spectral-methods}.
 To reproduce the offline studies and polynomial training from \code{experiment/adaptive\_dwt\_vla/}:
 {\scriptsize
 \begin{verbatim}
