@@ -55,6 +55,7 @@ Same fixed initial states (listed per row) for every model, 256×256 renders, 10
 | full40_dct_fixed@full_s0_dct_fixed_sqrtw:step_29000 | libero_object#0 | 10/10 | 1.00 | [0.72, 1.00] | 64.1 | 1041 | 1230 | 0/149 | – | 0–9 |
 | full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_14500 | libero_object#0 | 8/10 | 0.80 | [0.49, 0.94] | 64.1 | 1026 | 1243 | 0/188 | – | 0–9 |
 | full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_29000 | libero_object#0 | 10/10 | 1.00 | [0.72, 1.00] | 64.1 | 1027 | 1214 | 0/143 | – | 0–9 |
+| full40_poly_fixed@full_s0_poly_fixed_sqrtw:step_43500 | libero_object#0 | 10/10 | 1.00 | [0.72, 1.00] | 64.1 | 1053 | 1282 | 0/140 | – | 0–9 |
 
 *Malformed chunks*: for `fast_matched`, generated streams without `|` or whose BPE decode is not exactly 70 DCT coefficients; they are executed after upstream's relaxed decode (zero-pad / truncate), exactly as stock π₀-FAST does. For the DWT variants, streams the grammar parser rejects (replaced by the safe fallback chunk); the constrained decoder makes these impossible by construction. *Masked grammar violations*: generated positions where the unconstrained argmax was an illegal token and the FSM mask changed the choice. Not available for `ref_*` (stock decoder).
 

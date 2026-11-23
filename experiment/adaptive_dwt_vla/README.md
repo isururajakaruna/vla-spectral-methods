@@ -118,7 +118,7 @@ epochs 1–3 (`full_s0_dwt_fixed_slw_step_{14500,29000,43500}`), the three epoch
 (`full_s0_dct_fixed_step_*`, added as `scripts/run_full_dct_control.sh` finishes), plain Haar from scratch
 (`full_s0_dwt_fixed_step_*`), DCT with √step weighting one epoch from DCT epoch 2 (`full_e3_dct_fixed_sqrtw_step_43500`)
 and from scratch (`full_s0_dct_fixed_sqrtw_step_{14500,29000}`), and orthogonal-polynomial tokens (`--variant poly_fixed`) with
-the same weighting (`full_s0_poly_fixed_sqrtw_step_{14500,29000}`). `train.py --weight-power p` weights coefficient-token losses
+the same weighting (`full_s0_poly_fixed_sqrtw_step_{14500,29000,43500}`; epoch 3 reaches 92.8% on all 40 tasks). `train.py --weight-power p` weights coefficient-token losses
 by quantizer step ** p for any DWT/DCT/polynomial variant. Every intermediate checkpoint of these runs stays in `runs/`
 and is mirrored to the data partition; success per epoch is in section 7b of the report.
 
