@@ -324,7 +324,7 @@ Raw non-orthogonal polynomial bases are badly conditioned (condition number 819 
 At $H=10$, Gram polynomials change 51\% of tokens per edit versus 59\% for DCT-II and 65\% for the whole-window \code{sym4->haar} codec, while matching DCT's offline LIBERO validation MSE at the exact same 64 tokens/chunk ($1.64\times 10^{-4}$ vs.\ $1.65\times 10^{-4}$).
 
 We trained the Gram polynomial tokenizer (\code{poly\_fixed}) from scratch for two epochs on all 40 LIBERO tasks with gentler square-root step weighting ($p=0.5$, no soft labels), alongside a matched square-root-weighted DCT run from scratch so the transform comparison holds the loss constant.
-Table~\ref{tab:epoch1} and Figure~\ref{fig:epoch1} present all five models across epochs 1 and 2 on the same 400 episodes, and Table~\ref{tab:epoch1} adds epoch 3 for three of them.
+Table~\ref{tab:epoch1} and Figure~\ref{fig:epoch1} present all five models across epochs 1 and 2 on the same 400 episodes, and add epoch 3 for three of them.
 
 \begin{table}[t]
   \centering
@@ -361,8 +361,8 @@ Table~\ref{tab:epoch1} and Figure~\ref{fig:epoch1} present all five models acros
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.72\linewidth]{figures/epoch1_suites.pdf}
-  \caption{40-task LIBERO success (400 episodes/model). (a) Epochs 1 to 2: the ordering matches the token-shift ranking. (b) Epoch-2 suites: Gram polynomials reach 81\% on LIBERO-10 (+15 points over plain DCT).}
+  \includegraphics[width=0.72\linewidth]{figures/epoch_suites_v2.pdf}
+  \caption{40-task LIBERO success (400 episodes/model). (a) Epochs 1 to 3; the ordering matches the token-shift ranking at every epoch (dotted: full fine-tune). (b) Epoch-3 suites: Gram polynomials match or exceed full fine-tuning in every suite.}
   \label{fig:epoch1}
 \end{figure}
 
