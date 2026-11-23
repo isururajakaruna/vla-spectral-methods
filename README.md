@@ -1,7 +1,8 @@
 # Smooth Operator: Spectral Action Tokens for Vision-Language-Action Adaptation
 
 > **Quick navigation for reviewers**
-> - **Final Report (PDF):** [`report/report.pdf`](report/report.pdf) ([LaTeX source](report/report.tex))
+> - **Final Report v2 (PDF, adds epoch 3):** [`report/report_v2.pdf`](report/report_v2.pdf) ([LaTeX source](report/report_v2.tex))
+> - **Final Report v1 (PDF, as submitted on 22 Nov, epochs 1–2):** [`report/report.pdf`](report/report.pdf) ([LaTeX source](report/report.tex))
 > - **Interactive Experiment Dashboard (HTML):** [`experiment/reports/training_report.html`](experiment/reports/training_report.html) | [Experiment Trail](experiment/reports/experiment_trail.html)
 > - **Core Spectral Codec & Policy Code:** [`experiment/adaptive_dwt_vla/src/lerobot_policy_adaptive_dwt/`](experiment/adaptive_dwt_vla/src/lerobot_policy_adaptive_dwt/)
 > - **Measured LIBERO Results (400-ep JSONs & Summary):** [`experiment/adaptive_dwt_vla/results/summary.md`](experiment/adaptive_dwt_vla/results/summary.md)
@@ -32,7 +33,7 @@ All rows except the reference are LoRA adapters on `lerobot/pi0fast-base`, train
 
 - At **epoch 1**, Gram polynomials reach 81.2% overall and **91% on LIBERO-Goal** (vs. 72% for matched $\sqrt{\text{step}}$-weighted DCT, $p = 3.1\times 10^{-4}$).
 - At **epoch 2**, Gram polynomials reach **90.2%** overall, significantly beating plain DCT (85.5%, $p = 0.020$) and plain Haar (79.2%, $p = 8.0\times 10^{-6}$), with **81% on LIBERO-10** (+15 points over plain DCT, $p = 0.011$).
-- At **epoch 3**, Gram polynomials reach **92.8%** overall (Spatial 92%, Object 99%, Goal 91%, LIBERO-10 89%), the best result in this study. That is ahead of plain DCT at epoch 3 (89.2%, $p = 0.087$; LIBERO-10 89% vs. 79%), far ahead of soft-weighted Haar at epoch 3 (75.8%, $p = 1.7\times 10^{-13}$), and slightly ahead of the fully fine-tuned `pi0fast-libero` (89.8%, $p = 0.14$). The epoch-3 results were obtained after the report was submitted, so [`report/report.pdf`](report/report.pdf) covers epochs 1 and 2 only.
+- At **epoch 3**, Gram polynomials reach **92.8%** overall (Spatial 92%, Object 99%, Goal 91%, LIBERO-10 89%), the best result in this study. That is ahead of plain DCT at epoch 3 (89.2%, $p = 0.087$; LIBERO-10 89% vs. 79%), far ahead of soft-weighted Haar at epoch 3 (75.8%, $p = 1.7\times 10^{-13}$), and slightly ahead of the fully fine-tuned `pi0fast-libero` (89.8%, $p = 0.14$). From epoch 2 to 3, Spatial, Object, and Goal move by at most 3 points ($p \ge 0.58$) and only LIBERO-10 still rises ($p = 0.18$), so LoRA adaptation is close to saturation. The epoch-3 results came after the original submission: [`report/report_v2.pdf`](report/report_v2.pdf) includes them, while [`report/report.pdf`](report/report.pdf) (v1) covers epochs 1 and 2 only.
 - Synthetic token-shift analysis (400 smooth trajectories, 9 geometric edits, equal-accuracy quantizer) predicts this exact ordering: small smooth edits change **22%** of tokens in Gram polynomials, **30%** in DCT-II, and **69%** in Haar.
 
 ### Single-Task LIBERO-Object #0 (60 episodes: 3 seeds x 20 initial states, 2,000 updates)
